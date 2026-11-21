@@ -4,7 +4,7 @@
 
 ## Source of truth
 
-`android/vibeflix-v31-source.zip` is the canonical Android source archive for the existing Java/Media3 app. CI extracts and patches this archive; loose extracted files are not the build input. The archive is approximately 811 KB and an automated scan found no common embedded credential patterns (that scan is not a guarantee).
+`android/vibeflix-v31-source.zip` is the canonical Android source archive for the existing Java/Media3 app. CI extracts and patches this archive; loose extracted files are not the build input. The refreshed archive is approximately 821 KiB; an automated scan found no common embedded credential patterns (that scan is not a guarantee).
 
 The imported baseline is native Android/Java with Media3, Gradle 7.6.4, Android Gradle Plugin 7.4.2, JDK 17, compileSdk/targetSdk 34, and minSdk 23. The separate-install application ID is `org.example.play4u.movyexperiment.v31`; do not change it or modify the original app's package. User-facing source names are only **Server 1**, **Server 2**, and **Both Servers**.
 
@@ -23,7 +23,7 @@ The previous repository's latest known release is `v31-build34` (versionCode 34,
 
 `build-phone.yml` runs offline unit tests and builds a debug APK to verify package/version metadata; it does not sign or publish anything. `release-phone.yml` is designed to sign and publish only after a compatible Android key-rotation lineage, a replacement key, and protected CI secrets are configured. No test link is shared before a release exists.
 
-The Supabase project and user-scoped library schema are deployed. This archive includes native email/password sign-in, Android Keystore-encrypted session storage, and an explicitly enabled, local-first My List merge with tombstones. Public email signup is disabled. The app requires the `VIBEFLIX_SUPABASE_PUBLISHABLE_KEY` build environment variable to enable sign-in; it is intentionally absent from the archive and repository. The variable's presence in GitHub Actions has not been independently verified, and live sign-in/sync have not been tested. Watch history and playback progress remain local-only; when cloud sync is unavailable, local My List/history/resume continue working.
+The Supabase project and user-scoped library schema are deployed. The refreshed source archive contains native email/password sign-in, Android Keystore-encrypted session storage, and explicitly consented, local-first sync for My List, latest History per title, episode resume/progress, Continue Watching hidden state, title-removal tombstones, and Clear all History. Direct live SQL checks for timestamp clamping, clear/removal guards, removal ties, hidden-state transitions, completion ties, and test-fixture cleanup passed. Local state remains available offline and after a sync failure. Consent can be revoked from the account page; doing so stops future syncs but keeps both local data and the existing cloud copy. Cloud payloads contain canonical catalog metadata and episode keys only; stream/playback URLs and provider credentials are excluded. Public email signup is disabled. The app requires the `VIBEFLIX_SUPABASE_PUBLISHABLE_KEY` build environment variable to enable sign-in; it is intentionally absent from the archive and repository. The variable's presence in GitHub Actions has not been independently verified. Updated archive/CI verification, live Auth, PostgREST RLS isolation, and real-device/cross-device sync remain untested; see [`../docs/supabase-schema-rls-design.md`](../docs/supabase-schema-rls-design.md).
 
 ## Signing security
 
