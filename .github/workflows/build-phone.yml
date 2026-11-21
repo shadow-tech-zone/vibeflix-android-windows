@@ -7,12 +7,14 @@ on:
       - 'android/**'
       - 'release.json'
       - '.github/workflows/build-phone.yml'
+      - '.github/workflows/release-phone.yml'
   push:
     branches: [main]
     paths:
       - 'android/**'
       - 'release.json'
       - '.github/workflows/build-phone.yml'
+      - '.github/workflows/release-phone.yml'
 
 permissions:
   contents: read
@@ -30,10 +32,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
 
       - name: Validate release metadata
         run: |
