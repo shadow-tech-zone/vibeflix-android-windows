@@ -2,7 +2,7 @@
 
 > **Hobby/personal-use disclaimer:** Vibeflix is a personal hobby project for personal use. It is not a commercial product and is not affiliated with Netflix or any content provider. It is provided as-is, without warranties. Use only content and services you are authorized to access. Use original artwork, icons, and open fonts; do not use Netflix branding or proprietary assets.
 
-**Status: initial database schema applied; Android sign-in groundwork added; library sync is not implemented.** The active Supabase project is `vibeflix-sync` in `ap-southeast-1`. Migration `20261121213826_initial_library_schema` has been applied; its exact SQL source is [`../supabase/migrations/20261121213826_initial_library_schema.sql`](../supabase/migrations/20261121213826_initial_library_schema.sql). It creates the six user-scoped tables and policies documented below. The Android archive now includes email/password sign-in plumbing and Android Keystore-encrypted session storage, but no publishable key has been configured and live sign-in has not been tested. No library sync, merge RPC, or Windows client has been deployed. Auth has email enabled with confirmation required, and public email signup is disabled per the owner's choice. The current site URL remains `http://localhost:3000` and the redirect allow-list is empty; configure an Android-safe redirect before adding any callback-based auth flow.
+**Status: schema and My List timestamp guards applied; Android includes sign-in plus opt-in My List sync; history/progress sync remains unimplemented.** The active Supabase project is `vibeflix-sync` in `ap-southeast-1`. The tracked migrations [`20261121213826_initial_library_schema.sql`](../supabase/migrations/20261121213826_initial_library_schema.sql), [`20261121221815_my_list_sync_guard.sql`](../supabase/migrations/20261121221815_my_list_sync_guard.sql), [`20261121223008_my_list_clock_skew_clamp.sql`](../supabase/migrations/20261121223008_my_list_clock_skew_clamp.sql), and [`20261121223729_my_list_clock_and_tie_policy.sql`](../supabase/migrations/20261121223729_my_list_clock_and_tie_policy.sql) are applied. Android now includes email/password sign-in, Android Keystore-encrypted sessions, and an explicitly enabled, local-first My List merge using source-prefixed hashes of canonical catalog paths and tombstones. The optional GitHub Actions publishable-key variable is not independently verified; live sign-in and My List sync have not been tested. Public email signup is disabled and email confirmation remains required. No watch-history/progress sync, merge RPC, or Windows client is deployed. Auth's site URL remains `http://localhost:3000` with an empty redirect allow-list; configure an Android-safe redirect before adding any callback-based auth flow.
 
 ## 1. Goals and boundaries
 
@@ -20,7 +20,7 @@
 2. The Android app stores session tokens in Keystore-backed storage; Windows uses Windows Credential Manager or an equivalent secure store.
 3. Client builds may contain only the Supabase anon/publishable key. It is not a secret, but it should be supplied through the approved build configuration. **Never ship or commit the service-role key**: it bypasses RLS.
 4. Every user-owned row carries an `auth.users.id` owner (`user_id`, or `id` for `profiles`). RLS is enabled on every exposed table, policies target `authenticated`, and no `anon` policy is added.
-5. Keep local data while signed out. On sign-in/reconnect, merge queued local changes; do not clear local state until the server has acknowledged a successful sync. Sign-out must not silently erase the local library.
+5. Keep local data while signed out. My List sync starts only after explicit per-account opt-in; merge local/cloud state non-destructively and do not clear local state on a failed request. Sign-out must not erase the local library. History and progress remain device-only until their sync paths are implemented.
 6. Supabase is for account/library sync, not stream resolution or media delivery. No provider tokens, stream URLs, raw provider payload dumps, or credentials are stored in these tables.
 
 ## 3. Initial schema tables
@@ -113,7 +113,7 @@ create table public.watch_progress (
 
 - Owner column: `user_id`; the composite foreign key prevents cross-user title references.
 - `device_id` is optional conflict metadata, not an authorization claim. If retained, a future sync operation should verify that it belongs to the same `user_id`; alternatively omit it from v1.
-- `client_updated_at` is used only by the future merge operation. `updated_at` is server-generated/receipt time and is not trusted from the client.
+- `watch_progress.client_updated_at` is reserved for its future merge path; no Android progress writes are enabled. The My List table separately uses `client_updated_at` with the applied monotonic trigger described in Section 5. `updated_at` is server-generated/receipt time and is not trusted from the client.
 - Do not upload a row for every player heartbeat. Persist resume points at deliberate intervals and on pause/exit/completion.
 
 ### `my_list`
@@ -201,13 +201,13 @@ RLS is not a substitute for table privileges. Grant only the table/column operat
 - Progress is keyed per title/episode. Merge only the same key; derive Continue Watching from the latest incomplete item. Do not let an older queued write replace a newer server record.
 - My List uses a timestamped tombstone so removals sync across offline devices. Do not compact tombstones until the app has an approved safe compaction strategy.
 - History events are append-only and idempotent by event UUID; avoid high-volume events.
-- Proposed conflict rule: last-write-wins per record using `client_updated_at`, with a server-side future-clock sanity check (proposed starting threshold: reject timestamps more than five minutes ahead of server time; final threshold needs approval). Retain server-generated `updated_at` separately. On equal timestamps, keep the existing row or use a deterministic device-ID tie-breaker.
-- RLS alone does not implement atomic conflict resolution. Before client sync ships, use a reviewed server-side trigger or `SECURITY INVOKER` RPC that checks `auth.uid()`, validates timestamps, atomically compares the incoming record with the current row, and returns the winner. This is a future design requirement, not an implemented backend. Do not allow a direct-write path to bypass the merge rule.
+- Applied My List rule: compare per-title state by `client_updated_at`; stale updates are skipped atomically by a `BEFORE INSERT OR UPDATE` trigger. Any client timestamp ahead of server time is clamped to the current server statement time at millisecond precision, preventing a fast device clock from poisoning later writes. On exact timestamp ties, removals win (including in the database trigger), and the Android client makes each local per-title change monotonic by at least one millisecond. Only My List currently uses this guard.
+- This trigger does not guard `watch_progress` or `watch_events`; do not enable their cloud writes until equivalent per-record conflict/clock handling and request-level RLS tests are completed. My List still needs live Auth/device verification. RLS remains authoritative and owner IDs are taken from the signed-in session, not treated as authorization merely because the client supplied them.
 - Initial local-to-cloud merge must be explicit and non-destructive: combine My List, select the newest valid progress per key, union history by event ID, and preserve the local copy until the server confirms the result.
 
-## 6. RLS/security test plan before enabling sync (not yet completed)
+## 6. RLS/security test plan before treating sync as verified (not yet completed)
 
-The database catalog check is a structural verification only. Before shipping client sync, run request-level isolation tests using separate Auth users and exercise these cases:
+The database catalog check is structural verification only. Android My List sync is opt-in and remains unverified; before including it in a release or relying on cross-device data, run request-level isolation tests using separate Auth users and exercise these cases:
 
 1. Unauthenticated/`anon` requests cannot select, insert, update, or delete any user data.
 2. User A can access only A's rows. User A sees no User B rows and cannot insert as B, update/delete B's rows, change an owner, or reference B's `titles` row.
@@ -221,17 +221,17 @@ The database catalog check is a structural verification only. Before shipping cl
 The initial schema is in place, but the following decisions or implementation work remain before a production-facing client is enabled:
 
 - [x] Disable public email signup for this personal-use project; email confirmation remains required for email accounts.
-- [ ] Decide how the owner account will be provisioned and confirm email sign-in works for it.
-- [ ] Choose the stable, source-namespaced `title_id` rule (prefer a stable source content ID; a canonical detail-URL hash is a documented fallback, not a secret).
+- [x] Provision the owner Auth account and confirm it is email-confirmed. Live Android email/password sign-in still needs verification.
+- [x] For Android My List, use `s1-`/`s2-` plus SHA-256 of the canonical catalog path as `title_id`; store only allow-listed catalog path/year metadata (never stream URLs). A stable source content ID can replace the hash later if a reliable one is available.
 - [ ] Confirm per-episode progress and the `episode_key = ''` convention for movies suit the Android state model.
-- [ ] Decide My List tombstone retention and safe compaction rules.
+- [x] Keep My List tombstones indefinitely in v1; no automatic compaction is implemented.
 - [ ] Decide whether `watch_events` is required for v1, its retention, and clear-history behavior.
-- [ ] Approve conflict resolution, future-clock handling, and a server-side atomic merge mechanism. Direct writes currently do not enforce the proposed last-write-wins checks.
+- [x] Choose a pragmatic My List conflict baseline: monotonic last-write-wins, exact ties favor a removal, and any future client timestamp is clamped to millisecond server time. This is enforced by the applied trigger migrations; equivalent guards for watch progress are still pending.
 - [ ] Define account deletion/export expectations and device revocation behavior.
-- [ ] Add request-level RLS isolation tests with separate users before any sync client is enabled.
-- [x] Add sign-in-only Auth UI/API plumbing and Android Keystore AES-GCM session storage to the Android archive; it still needs a configured publishable key and live verification.
-- [ ] Provision the owner account and verify email/password sign-in. Public signup remains disabled.
-- [ ] Implement local-first library sync without replacing local Android data; retain session tokens only in platform-secure storage.
-- [ ] Add a server-side atomic conflict-resolution path and request-level isolation tests before enabling sync writes.
+- [ ] Add request-level RLS isolation tests with separate users before relying on cross-device sync.
+- [x] Add sign-in-only Auth UI/API plumbing and Android Keystore AES-GCM session storage; the publishable-key Actions variable is unverified and live sign-in remains untested.
+- [ ] Verify Android email/password sign-in on a device. The owner account is provisioned and confirmed; public signup remains disabled.
+- [x] Implement opt-in, local-first Android My List sync with durable tombstones; live Auth/device verification and automated end-to-end tests remain.
+- [ ] Extend sync to watch history, Continue Watching/resume, hidden state, and add timestamp guards for watch progress before enabling those writes.
 
-The Supabase project and initial migration were created as part of the approved integration phase. Only sign-in groundwork is present in Android; no cloud library sync or Windows client is deployed, and no service-role credential is present in the repository.
+The Supabase project and initial schema are deployed. Android now has sign-in groundwork and an explicitly enabled My List sync path; no cloud history/progress sync or Windows client is deployed. No service-role credential is present in the repository. CI compilation/tests cannot establish live sign-in, REST/RLS isolation, real-device behavior, or playback.

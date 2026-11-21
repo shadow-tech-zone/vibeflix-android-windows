@@ -29,7 +29,7 @@ The canonical baseline is `android/vibeflix-v31-source.zip`; CI extracts and pat
 
 ## Next phase
 
-The roadmap keeps native Android as the baseline, adds optional Supabase Auth/sync for watch history, My List, and resume, and may later build a native Windows client with its own playback stack. The `vibeflix-sync` Supabase project and initial RLS-protected schema are now in place; public email signup is disabled per the owner's choice. Sign-in/session-storage groundwork is in the Android archive, but it has not been configured or exercised against live Auth and does not sync user data yet. Owner-account provisioning, key configuration, and sync merge behavior remain for the next integration steps.
+The roadmap keeps native Android as the baseline, adds optional Supabase Auth/sync for watch history, My List, and resume, and may later build a native Windows client with its own playback stack. The `vibeflix-sync` Supabase project and RLS-protected schema are in place; public email signup is disabled. Android now includes sign-in/session storage and an explicitly enabled, local-first My List merge with tombstones. The publishable-key Actions variable remains unverified, and live Auth/My List sync have not been tested. Watch history and playback progress are still local-only.
 
 ## Verification posture
 

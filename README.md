@@ -7,7 +7,7 @@ This is the private repository for the next Vibeflix phase.
 ## Status
 
 - **Android baseline:** The canonical source archive is `android/vibeflix-v31-source.zip`. The latest PR CI compile/unit-test/debug-package checks passed. A new signed release is blocked until an approved, non-exposed signing key and fingerprint are configured securely.
-- **Sync:** Supabase project `vibeflix-sync` is running in `ap-southeast-1`; migration `20261121213826` created six user-scoped tables with RLS. A native email/password sign-in foundation now stores tokens encrypted with Android Keystore, but it is disabled until the optional publishable key is supplied at build time, and library sync is not implemented. Public signup is disabled per the owner's choice. See [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md).
+- **Sync:** Supabase project `vibeflix-sync` is running in `ap-southeast-1`; its six user-scoped tables use RLS. Android now has optional sign-in and an explicitly enabled, local-first My List merge with timestamped tombstones. It still needs a configured publishable key and live Auth/device verification. Watch history and playback progress remain local-only. Public signup is disabled. See [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md).
 - **Windows:** The new native desktop client is planned but has not been scaffolded yet.
 - **Releases:** This repository has no published release yet. Do not share test/download links until a release is published with its APK asset attached.
 
