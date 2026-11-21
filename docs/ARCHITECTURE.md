@@ -25,11 +25,13 @@ The Android project is versioned as the canonical source archive `android/vibefl
 
 Local Android state is stored on-device and includes saved titles, watch history, playback positions, resume ownership, hidden Continue Watching entries, recent searches, source selection, and UI focus/scroll state. Existing local behavior must remain available when signed out or offline.
 
-## Proposed sync architecture
+## Supabase sync foundation
 
-The approved direction is Supabase Auth and user-scoped sync for watch history, My List, and resume. The schema/RLS plan is in `docs/supabase-schema-rls-design.md`. Project creation has been authorized for the appropriate roadmap phase, but no project, migration, auth configuration, or Android sync client has been deployed yet. Client tokens must use platform-secure storage; no service-role key belongs in a client or repository.
+Supabase project `vibeflix-sync` is active in `ap-southeast-1`. Migration `20261121213826_initial_library_schema` is applied and defines profiles, devices, titles, watch progress, My List tombstones, and watch events with authenticated-user RLS and constrained client grants. The applied SQL is tracked at `supabase/migrations/20261121213826_initial_library_schema.sql`; design and remaining decisions are documented in `docs/supabase-schema-rls-design.md`.
 
-Future sync must be local-first, queue changes offline, and merge per user/title/episode without replacing the Android app's current local behavior. RLS must be tested for cross-user isolation before client sync is enabled.
+No Android authentication or sync client has been deployed. Auth currently has email enabled, requires email confirmation, and still allows public email signup; no Auth settings have been changed. Choose the signup policy before exposing registration. Client tokens must use platform-secure storage; the service-role key must never belong in a client or repository.
+
+Future sync must be local-first, queue changes offline, and merge per user/title/episode without replacing the Android app's current local behavior. The database RLS catalog and grants have been inspected, but adversarial cross-user RLS tests and the server-side conflict-resolution path have not been implemented; complete both before enabling client sync.
 
 ## Windows direction
 

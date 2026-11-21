@@ -6,8 +6,8 @@ This is the private repository for the next Vibeflix phase.
 
 ## Status
 
-- **Android baseline:** The canonical source archive is now at `android/vibeflix-v31-source.zip`. The verification and release workflows are in place; the baseline build still needs to be run in CI. A new signed release is blocked until an approved, non-exposed signing key and fingerprint are configured securely.
-- **Sync:** The owner approved Supabase project creation at the appropriate roadmap phase. The Supabase connection is available, but no project/backend has been created yet. The schema and RLS plan is in [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md).
+- **Android baseline:** The canonical source archive is `android/vibeflix-v31-source.zip`. The latest PR CI compile/unit-test/debug-package checks passed. A new signed release is blocked until an approved, non-exposed signing key and fingerprint are configured securely.
+- **Sync:** Supabase project `vibeflix-sync` is running in `ap-southeast-1`. Initial migration `20261121213826` is applied with six user-scoped tables and RLS. No Android authentication or sync client has been integrated yet. Email confirmation is required, but public email signup is still enabled; decide whether that is appropriate before exposing an auth flow. See [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md).
 - **Windows:** The new native desktop client is planned but has not been scaffolded yet.
 - **Releases:** This repository has no published release yet. Do not share test/download links until a release is published with its APK asset attached.
 
@@ -17,6 +17,7 @@ This is the private repository for the next Vibeflix phase.
 - `.github/workflows/build-phone.yml` — offline unit tests and debug package metadata verification only; it creates no download link.
 - `.github/workflows/release-phone.yml` — gated signed-release flow; requires protected signing secrets, a compatible rotation lineage, and the approved certificate fingerprint.
 - `release.json` — versionCode, versionName, tag, asset name, and title for the next Android release.
+- `supabase/migrations/` — versioned SQL applied to the remote Vibeflix sync project.
 - `docs/` — project, architecture, release, and Supabase design documentation.
 
 ## Product constraints

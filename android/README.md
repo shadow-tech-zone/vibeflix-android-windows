@@ -4,7 +4,7 @@
 
 ## Source of truth
 
-`android/vibeflix-v31-source.zip` is the canonical Android source archive copied from the user's `shadow-tech-zone/app-test` repository. CI extracts and patches this archive; loose extracted files are not the build input. The archive is approximately 811 KB and an automated scan found no common embedded credential patterns (that scan is not a guarantee).
+`android/vibeflix-v31-source.zip` is the canonical Android source archive for the existing Java/Media3 app. CI extracts and patches this archive; loose extracted files are not the build input. The archive is approximately 811 KB and an automated scan found no common embedded credential patterns (that scan is not a guarantee).
 
 The imported baseline is native Android/Java with Media3, Gradle 7.6.4, Android Gradle Plugin 7.4.2, JDK 17, compileSdk/targetSdk 34, and minSdk 23. The separate-install application ID is `org.example.play4u.movyexperiment.v31`; do not change it or modify the original app's package. User-facing source names are only **Server 1**, **Server 2**, and **Both Servers**.
 

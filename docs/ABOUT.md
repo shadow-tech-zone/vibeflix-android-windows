@@ -6,7 +6,7 @@
 
 Vibeflix is a personal native Android app with a dark cinematic interface and a Media3-based player. The Android app remains the primary product and must keep working independently of any future account or Windows client.
 
-The next phase is intended to add a fresh native Windows desktop app and optional cross-device sync for watch history, My List, and resume. Those features are planned work, not claims about functionality already present in the Android baseline. No Supabase project or Windows client has been created in this bootstrap.
+The roadmap may add a fresh native Windows desktop app and optional cross-device sync for watch history, My List, and resume. The Supabase project and initial user-scoped schema now exist, but the Android authentication/sync client and Windows app have not been implemented. Cloud sync is not yet a user-facing feature; the Android baseline continues to use local storage.
 
 ## Current Android behavior
 

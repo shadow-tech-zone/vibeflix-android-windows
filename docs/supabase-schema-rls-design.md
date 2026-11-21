@@ -2,7 +2,7 @@
 
 > **Hobby/personal-use disclaimer:** Vibeflix is a personal hobby project for personal use. It is not a commercial product and is not affiliated with Netflix or any content provider. It is provided as-is, without warranties. Use only content and services you are authorized to access. Use original artwork, icons, and open fonts; do not use Netflix branding or proprietary assets.
 
-**Status: DRAFT — for review and explicit approval.** This file is a design proposal only. No Supabase project, schema, table, policy, function, Auth configuration, or secret has been created. Do not treat the SQL sketches below as migrations. Project creation and implementation require separate explicit approval.
+**Status: initial database schema applied; client integration is not implemented.** The active Supabase project is `vibeflix-sync` in `ap-southeast-1`. Migration `20261121213826_initial_library_schema` has been applied; its exact SQL source is [`../supabase/migrations/20261121213826_initial_library_schema.sql`](../supabase/migrations/20261121213826_initial_library_schema.sql). It creates the six user-scoped tables and policies documented below. The sketches in this document describe intent; the tracked migration is authoritative for exact SQL. No Android Auth/sync client, merge RPC, or Windows client has been deployed. Auth settings have not been modified: email confirmation is required, but public email signup remains enabled; the current site URL is `http://localhost:3000` and the redirect allow-list is empty. Decide the signup policy and configure an Android-safe redirect before exposing registration.
 
 ## 1. Goals and boundaries
 
@@ -14,18 +14,18 @@
 - Use original artwork, icons, and open fonts; do not use Netflix branding or proprietary assets.
 - Keep all rows user-scoped. No anonymous/public access to a user's library or profile.
 
-## 2. Proposed client and trust model
+## 2. Proposed client and trust model (not yet implemented)
 
-1. The client signs in using Supabase Auth. Email verification is required. Email remains in `auth.users`; do not duplicate it into `profiles`.
+1. The intended client signs in using Supabase Auth. Email verification is currently required. Email remains in `auth.users`; do not duplicate it into `profiles`.
 2. The Android app stores session tokens in Keystore-backed storage; Windows uses Windows Credential Manager or an equivalent secure store.
 3. Client builds may contain only the Supabase anon/publishable key. It is not a secret, but it should be supplied through the approved build configuration. **Never ship or commit the service-role key**: it bypasses RLS.
 4. Every user-owned row carries an `auth.users.id` owner (`user_id`, or `id` for `profiles`). RLS is enabled on every exposed table, policies target `authenticated`, and no `anon` policy is added.
 5. Keep local data while signed out. On sign-in/reconnect, merge queued local changes; do not clear local state until the server has acknowledged a successful sync. Sign-out must not silently erase the local library.
 6. Supabase is for account/library sync, not stream resolution or media delivery. No provider tokens, stream URLs, raw provider payload dumps, or credentials are stored in these tables.
 
-## 3. Proposed tables
+## 3. Initial schema tables
 
-The sketches use `public` for readability. Exact types, grants, indexes, retention, and migration order need review before implementation.
+The following table sketches describe the applied v1 schema in `public`; the tracked migration contains the exact types, defaults, triggers, indexes, grants, and policies. Table creation does not mean the Android client currently reads or writes cloud data.
 
 ### `profiles`
 
@@ -161,7 +161,7 @@ create table public.watch_events (
 
 ## 4. RLS and database privileges
 
-Enable RLS on **every** table in `public`. The following ownership mapping is proposed:
+RLS is enabled on all six tables by the applied migration. Authenticated users receive only the operations listed below, with owner checks on each row. Catalog inspection confirmed RLS is enabled and the expected policies and table/column grants are present; this is not yet an adversarial cross-user test suite.
 
 | Table | Owner expression | Allowed client operations |
 | --- | --- | --- |
@@ -205,7 +205,9 @@ RLS is not a substitute for table privileges. Grant only the table/column operat
 - RLS alone does not implement atomic conflict resolution. Before client sync ships, use a reviewed server-side trigger or `SECURITY INVOKER` RPC that checks `auth.uid()`, validates timestamps, atomically compares the incoming record with the current row, and returns the winner. This is a future design requirement, not an implemented backend. Do not allow a direct-write path to bypass the merge rule.
 - Initial local-to-cloud merge must be explicit and non-destructive: combine My List, select the newest valid progress per key, union history by event ID, and preserve the local copy until the server confirms the result.
 
-## 6. RLS/security test plan before enabling sync
+## 6. RLS/security test plan before enabling sync (not yet completed)
+
+The database catalog check is a structural verification only. Before shipping client sync, run request-level isolation tests using separate Auth users and exercise these cases:
 
 1. Unauthenticated/`anon` requests cannot select, insert, update, or delete any user data.
 2. User A can access only A's rows. User A sees no User B rows and cannot insert as B, update/delete B's rows, change an owner, or reference B's `titles` row.
@@ -214,15 +216,18 @@ RLS is not a substitute for table privileges. Grant only the table/column operat
 5. Test stale, future-dated, equal-timestamp, duplicate-event, and offline-retry cases through the approved merge path.
 6. Confirm no client build, repository file, workflow log, or release contains a service-role key, provider token, password, or signing secret.
 
-## 7. Decisions needed for approval
+## 7. Decisions and work still needed
 
-- [ ] Approve email/password with email verification as the first Auth method.
-- [ ] Approve a **per-user** `titles` catalog, with only allow-listed metadata and HTTPS image URLs.
-- [ ] Choose the stable `title_id` rule (prefer a stable source content ID; URL hash is a documented fallback, not a secret).
-- [ ] Approve per-episode progress and the `episode_key = ''` convention for movies.
-- [ ] Approve My List tombstones and decide how/when they can be compacted.
-- [ ] Decide whether `watch_events` is required for v1 and its retention/clear-history behavior.
-- [ ] Approve last-write-wins semantics, the future-clock threshold, and the server-side merge mechanism.
-- [ ] Approve account deletion/export expectations and device revocation behavior.
+The initial schema is in place, but the following decisions or implementation work remain before a production-facing client is enabled:
 
-**Project creation has been authorized for the appropriate roadmap phase.** No backend or Supabase project has been created yet; execution remains gated on the Android baseline prerequisites and a working Supabase connection, followed by tested schema/RLS implementation.
+- [ ] Choose the signup policy. Current Supabase defaults allow public email signup while requiring email confirmation; this setting has not been changed.
+- [ ] Choose the stable, source-namespaced `title_id` rule (prefer a stable source content ID; a canonical detail-URL hash is a documented fallback, not a secret).
+- [ ] Confirm per-episode progress and the `episode_key = ''` convention for movies suit the Android state model.
+- [ ] Decide My List tombstone retention and safe compaction rules.
+- [ ] Decide whether `watch_events` is required for v1, its retention, and clear-history behavior.
+- [ ] Approve conflict resolution, future-clock handling, and a server-side atomic merge mechanism. Direct writes currently do not enforce the proposed last-write-wins checks.
+- [ ] Define account deletion/export expectations and device revocation behavior.
+- [ ] Add request-level RLS isolation tests with separate users before any sync client is enabled.
+- [ ] Integrate Auth and sync without replacing local Android data; keep all session tokens in platform-secure storage.
+
+The Supabase project and initial migration were created as part of the approved integration phase. This is only a database foundation: no Android or Windows client has been deployed, and no service-role credential is present in the repository.
