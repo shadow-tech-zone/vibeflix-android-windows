@@ -2,7 +2,7 @@
 
 > **Hobby/personal-use disclaimer:** Vibeflix is a personal hobby project for personal use. It is not a commercial product and is not affiliated with Netflix or any content provider. It is provided as-is, without warranties. Use only content and services you are authorized to access. Use original artwork, icons, and open fonts; do not use Netflix branding or proprietary assets.
 
-**Status: initial database schema applied; client integration is not implemented.** The active Supabase project is `vibeflix-sync` in `ap-southeast-1`. Migration `20261121213826_initial_library_schema` has been applied; its exact SQL source is [`../supabase/migrations/20261121213826_initial_library_schema.sql`](../supabase/migrations/20261121213826_initial_library_schema.sql). It creates the six user-scoped tables and policies documented below. The sketches in this document describe intent; the tracked migration is authoritative for exact SQL. No Android Auth/sync client, merge RPC, or Windows client has been deployed. Auth settings have not been modified: email confirmation is required, but public email signup remains enabled; the current site URL is `http://localhost:3000` and the redirect allow-list is empty. Decide the signup policy and configure an Android-safe redirect before exposing registration.
+**Status: initial database schema applied; Android sign-in groundwork added; library sync is not implemented.** The active Supabase project is `vibeflix-sync` in `ap-southeast-1`. Migration `20261121213826_initial_library_schema` has been applied; its exact SQL source is [`../supabase/migrations/20261121213826_initial_library_schema.sql`](../supabase/migrations/20261121213826_initial_library_schema.sql). It creates the six user-scoped tables and policies documented below. The Android archive now includes email/password sign-in plumbing and Android Keystore-encrypted session storage, but no publishable key has been configured and live sign-in has not been tested. No library sync, merge RPC, or Windows client has been deployed. Auth has email enabled with confirmation required, and public email signup is disabled per the owner's choice. The current site URL remains `http://localhost:3000` and the redirect allow-list is empty; configure an Android-safe redirect before adding any callback-based auth flow.
 
 ## 1. Goals and boundaries
 
@@ -220,7 +220,8 @@ The database catalog check is a structural verification only. Before shipping cl
 
 The initial schema is in place, but the following decisions or implementation work remain before a production-facing client is enabled:
 
-- [ ] Choose the signup policy. Current Supabase defaults allow public email signup while requiring email confirmation; this setting has not been changed.
+- [x] Disable public email signup for this personal-use project; email confirmation remains required for email accounts.
+- [ ] Decide how the owner account will be provisioned and confirm email sign-in works for it.
 - [ ] Choose the stable, source-namespaced `title_id` rule (prefer a stable source content ID; a canonical detail-URL hash is a documented fallback, not a secret).
 - [ ] Confirm per-episode progress and the `episode_key = ''` convention for movies suit the Android state model.
 - [ ] Decide My List tombstone retention and safe compaction rules.
@@ -228,6 +229,9 @@ The initial schema is in place, but the following decisions or implementation wo
 - [ ] Approve conflict resolution, future-clock handling, and a server-side atomic merge mechanism. Direct writes currently do not enforce the proposed last-write-wins checks.
 - [ ] Define account deletion/export expectations and device revocation behavior.
 - [ ] Add request-level RLS isolation tests with separate users before any sync client is enabled.
-- [ ] Integrate Auth and sync without replacing local Android data; keep all session tokens in platform-secure storage.
+- [x] Add sign-in-only Auth UI/API plumbing and Android Keystore AES-GCM session storage to the Android archive; it still needs a configured publishable key and live verification.
+- [ ] Provision the owner account and verify email/password sign-in. Public signup remains disabled.
+- [ ] Implement local-first library sync without replacing local Android data; retain session tokens only in platform-secure storage.
+- [ ] Add a server-side atomic conflict-resolution path and request-level isolation tests before enabling sync writes.
 
-The Supabase project and initial migration were created as part of the approved integration phase. This is only a database foundation: no Android or Windows client has been deployed, and no service-role credential is present in the repository.
+The Supabase project and initial migration were created as part of the approved integration phase. Only sign-in groundwork is present in Android; no cloud library sync or Windows client is deployed, and no service-role credential is present in the repository.

@@ -23,6 +23,8 @@ The previous repository's latest known release is `v31-build34` (versionCode 34,
 
 `build-phone.yml` runs offline unit tests and builds a debug APK to verify package/version metadata; it does not sign or publish anything. `release-phone.yml` is designed to sign and publish only after a compatible Android key-rotation lineage, a replacement key, and protected CI secrets are configured. No test link is shared before a release exists.
 
+The Supabase project and initial library schema are deployed. This archive now includes a native email/password sign-in foundation and Android Keystore-encrypted session storage, but no library data is synced yet. Public email signup is disabled. The app requires the `VIBEFLIX_SUPABASE_PUBLISHABLE_KEY` build environment variable to enable sign-in; it is intentionally absent from the archive and repository. Without it, cloud sign-in stays unavailable while local My List/history/resume continue working.
+
 ## Signing security
 
 No signing key, password, or signing file was copied into this repository. The source repository was publicly accessible during migration and had tracked signing material; treat those legacy credentials as compromised even if visibility is changed later. Do not reuse them. A compatible key-rotation/update plan for the existing Android package must be confirmed before a new signed release. Store only approved replacement material in protected CI secrets, never in Git or chat.
