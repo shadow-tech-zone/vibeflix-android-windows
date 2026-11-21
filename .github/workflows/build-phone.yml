@@ -94,7 +94,43 @@ jobs:
         run: |
           set -euo pipefail
           cd "$ANDROID_PROJECT"
-          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+          set +e
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/vibeflix-test.log"
+          TEST_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [[ "$TEST_STATUS" -ne 0 ]]; then
+            python3 - "$RUNNER_TEMP/vibeflix-test.log" "$ANDROID_PROJECT/app/build/test-results/testDebugUnitTest" <<'PY'
+          from pathlib import Path
+          import sys
+          import xml.etree.ElementTree as ET
+
+          def escape(value):
+              return value.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+
+          log = Path(sys.argv[1])
+          reports = Path(sys.argv[2])
+          failures = 0
+          for report in reports.glob('*.xml') if reports.exists() else ():
+              try:
+                  root = ET.parse(report).getroot()
+              except ET.ParseError:
+                  continue
+              for case in root.findall('.//testcase'):
+                  failure = case.find('failure')
+                  if failure is None:
+                      failure = case.find('error')
+                  if failure is None:
+                      continue
+                  label = case.attrib.get('classname', '') + '.' + case.attrib.get('name', 'test')
+                  detail = (failure.attrib.get('message') or '') + '\n' + (failure.text or '')
+                  print(f'::error title=Android unit test failure::{escape(label + ": " + detail[:5000])}')
+                  failures += 1
+          if failures == 0 and log.exists():
+              for line in log.read_text(encoding='utf-8', errors='replace').splitlines()[-25:]:
+                  print(f'::error title=Gradle unit-test failure::{escape(line)}')
+          PY
+            exit "$TEST_STATUS"
+          fi
 
       - name: Build debug APK (no release link)
         run: |
