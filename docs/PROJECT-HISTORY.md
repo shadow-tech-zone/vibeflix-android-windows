@@ -29,7 +29,7 @@ The canonical baseline is `android/vibeflix-v31-source.zip`; CI extracts and pat
 
 ## Next phase
 
-The roadmap keeps native Android as the baseline, adds optional Supabase Auth/sync for watch history, My List, and resume, and may later build a native Windows client with its own playback stack. The `vibeflix-sync` Supabase project and RLS-protected schema are in place; public email signup is disabled. Android includes sign-in/session storage and an explicitly enabled, local-first My List merge with tombstones. Direct database checks now pass for My List inserts and timestamp conflict guards, but the publishable-key Actions variable, live Auth, request-level RLS, and Android My List sync remain unverified. Watch history and playback progress are still local-only.
+The roadmap keeps native Android as the baseline, adds optional Supabase Auth/sync for watch history, My List, and resume, and may later build a native Windows client with its own playback stack. The `vibeflix-sync` Supabase project and RLS-protected schema are in place; public email signup is disabled. Android includes sign-in/session storage and an explicitly enabled, local-first My List merge with tombstones. Direct database checks now pass for My List inserts and timestamp conflict guards; a simulated authenticated role could access its own row but not another claimed identity's. The publishable-key Actions variable, live Auth, real PostgREST RLS, and Android My List sync remain unverified. Watch history and playback progress are still local-only.
 
 ## Verification posture
 
