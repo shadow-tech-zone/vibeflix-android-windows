@@ -925,4 +925,68 @@ public sealed partial class MainWindow
             : $"{value.Minutes:00}:{value.Seconds:00}";
     }
 
+    private async Task ConfirmClearHistoryAsync()
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "Clear local History?",
+            Content = "This removes local History entries. My List and episode resume positions will remain.",
+            PrimaryButtonText = "Clear History",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = AppRoot.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            _library.ClearHistory();
+            RenderCurrentPage(resetScroll: true);
+        }
+        catch (IOException)
+        {
+            ShowLocalWriteError();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ShowLocalWriteError();
+        }
+    }
+
+    private async Task ConfirmClearLibraryAsync()
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "Reset local library data?",
+            Content = "This clears My List, History, and local playback positions from this device. This action cannot be undone.",
+            PrimaryButtonText = "Reset local data",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = AppRoot.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            _library.ClearLibrary();
+            RenderCurrentPage(resetScroll: true);
+        }
+        catch (IOException)
+        {
+            ShowLocalWriteError();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ShowLocalWriteError();
+        }
+    }
+
 }
