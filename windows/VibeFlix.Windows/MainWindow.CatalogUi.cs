@@ -36,6 +36,10 @@ public sealed partial class MainWindow
         272,
         Math.Max(128, (PageViewportWidth - (2 * ContentGutter)) * 0.68));
 
+    private double PosterShelfCardWidth => Math.Min(
+        178,
+        Math.Max(128, (PageViewportWidth - (2 * ContentGutter)) * 0.18));
+
     private StackPanel CreatePageHeader(string eyebrow, string title, string description)
     {
         var compact = PageViewportWidth < 560;
@@ -466,10 +470,10 @@ public sealed partial class MainWindow
             ZoomMode = ZoomMode.Disabled
         };
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
-        var cardWidth = ShelfCardWidth;
+        var cardWidth = PosterShelfCardWidth;
         foreach (var title in titles)
         {
-            row.Children.Add(CreateTitleCard(title, cardWidth, landscape: true));
+            row.Children.Add(CreateTitleCard(title, cardWidth));
         }
 
         scroller.Content = row;
@@ -602,6 +606,38 @@ public sealed partial class MainWindow
             VerticalContentAlignment = VerticalAlignment.Stretch,
             UseSystemFocusVisuals = true
         };
+        Border? titlePreview = null;
+        if (!landscape && poster.Child is Grid posterGrid)
+        {
+            var previewContent = new StackPanel { Spacing = 7, VerticalAlignment = VerticalAlignment.Center };
+            var previewTitle = CreateText(title.Name, 13, "#FFFFFF", FontWeights.SemiBold, TextWrapping.Wrap);
+            previewTitle.MaxLines = 2;
+            previewTitle.TextTrimming = TextTrimming.CharacterEllipsis;
+            previewContent.Children.Add(previewTitle);
+            var previewMetadata = CreateText(title.CardMetadata, 9, "#D2D8E2", TextWrapping.Wrap);
+            previewMetadata.MaxLines = 2;
+            previewContent.Children.Add(previewMetadata);
+            var synopsis = CreateText(
+                string.IsNullOrWhiteSpace(title.Synopsis) ? "Open the title for provider details." : title.Synopsis,
+                10,
+                "#E2E6EE",
+                TextWrapping.Wrap);
+            synopsis.MaxLines = 4;
+            previewContent.Children.Add(synopsis);
+            previewContent.Children.Add(CreateText("VIEW TITLE DETAILS", 8, "#F08A92", FontWeights.SemiBold, characterSpacing: 65));
+            titlePreview = new Border
+            {
+                Padding = new Thickness(11),
+                CornerRadius = new CornerRadius(7),
+                Background = Brush("#E6101010"),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false,
+                Child = previewContent
+            };
+            posterGrid.Children.Add(titlePreview);
+        }
+
         var pointerOverPoster = false;
         var posterHasFocus = false;
         void UpdatePosterEmphasis()
@@ -609,6 +645,10 @@ public sealed partial class MainWindow
             var highlighted = pointerOverPoster || posterHasFocus;
             poster.BorderBrush = Brush(highlighted ? "#E34855" : "#3A3A3A");
             poster.BorderThickness = new Thickness(highlighted ? 2 : 1);
+            if (titlePreview is not null)
+            {
+                titlePreview.Visibility = highlighted ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
 
         posterButton.PointerEntered += (_, _) =>
