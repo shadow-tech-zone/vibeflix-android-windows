@@ -59,7 +59,7 @@ public sealed partial class MainWindow
         };
         AutomationProperties.SetName(seasonPicker, "Select a season");
         Button? listButton = null;
-        var playButton = CreateActionButton("▶  Play", () => _ = StartSelectedPlaybackAsync());
+        var playButton = CreateActionButton("▶  Play", () => { });
         playButton.IsEnabled = false;
         var playbackStarted = false;
         var activePlaybackPath = string.Empty;
@@ -144,18 +144,19 @@ public sealed partial class MainWindow
         playerPanel.Children.Add(playbackProgress);
         playerPanel.Children.Add(playbackPositionText);
         var playerActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var previousEpisodeButton = CreateActionButton("← Previous episode", () => _ = NavigateEpisodeAsync(-1));
-        var nextEpisodeButton = CreateActionButton("Next episode →", () => _ = NavigateEpisodeAsync(1));
+        var previousEpisodeButton = CreateActionButton("← Previous episode", () => { });
+        var nextEpisodeButton = CreateActionButton("Next episode →", () => { });
         previousEpisodeButton.Visibility = title.IsSeries ? Visibility.Visible : Visibility.Collapsed;
         nextEpisodeButton.Visibility = title.IsSeries ? Visibility.Visible : Visibility.Collapsed;
         previousEpisodeButton.IsEnabled = false;
         nextEpisodeButton.IsEnabled = false;
-        var tryNextStreamButton = CreateActionButton("Try another stream", () => _ = StartNextStreamAsync());
+        var tryNextStreamButton = CreateActionButton("Try another stream", () => { });
         tryNextStreamButton.Visibility = Visibility.Collapsed;
+        var backToDetailsButton = CreateActionButton("Back to details", () => { });
         playerActions.Children.Add(previousEpisodeButton);
         playerActions.Children.Add(nextEpisodeButton);
         playerActions.Children.Add(tryNextStreamButton);
-        playerActions.Children.Add(CreateActionButton("Back to details", () => ReturnToDetails()));
+        playerActions.Children.Add(backToDetailsButton);
         playerPanel.Children.Add(playerActions);
 
         body.Children.Add(detailsPanel);
@@ -165,6 +166,11 @@ public sealed partial class MainWindow
 
         var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         progressTimer.Tick += (_, _) => SavePlaybackCheckpoint();
+        playButton.Click += (_, _) => _ = StartSelectedPlaybackAsync();
+        previousEpisodeButton.Click += (_, _) => _ = NavigateEpisodeAsync(-1);
+        nextEpisodeButton.Click += (_, _) => _ = NavigateEpisodeAsync(1);
+        tryNextStreamButton.Click += (_, _) => _ = StartNextStreamAsync();
+        backToDetailsButton.Click += (_, _) => ReturnToDetails();
 
         void SetFeedback(string message, bool isError = false)
         {
@@ -180,7 +186,8 @@ public sealed partial class MainWindow
 
         void UpdateEpisodeNavigationButtons()
         {
-            if (activeEpisode is null || activeSeasonIndex < 0 || activeSeasonIndex >= seasons.Count)
+            var selectedEpisode = activeEpisode;
+            if (selectedEpisode is null || activeSeasonIndex < 0 || activeSeasonIndex >= seasons.Count)
             {
                 previousEpisodeButton.IsEnabled = false;
                 nextEpisodeButton.IsEnabled = false;
@@ -188,7 +195,7 @@ public sealed partial class MainWindow
             }
 
             var episodes = seasons[activeSeasonIndex].Episodes;
-            var episodeIndex = episodes.ToList().FindIndex(episode => episode.Number == activeEpisode.Number);
+            var episodeIndex = episodes.ToList().FindIndex(episode => episode.Number == selectedEpisode.Number);
             previousEpisodeButton.IsEnabled = episodeIndex > 0 || activeSeasonIndex > 0;
             nextEpisodeButton.IsEnabled = episodeIndex >= 0
                 && (episodeIndex < episodes.Count - 1 || activeSeasonIndex < seasons.Count - 1);
@@ -469,8 +476,9 @@ public sealed partial class MainWindow
         async Task StartNextStreamAsync()
         {
             var currentResolution = resolution;
+            var currentPlaybackCancellation = playbackCancellation;
             if (currentResolution is null || selectedStreamIndex + 1 >= currentResolution.Streams.Count
-                || playbackCancellation is null || playbackCancellation.IsCancellationRequested)
+                || currentPlaybackCancellation is null || currentPlaybackCancellation.IsCancellationRequested)
             {
                 return;
             }
@@ -481,7 +489,7 @@ public sealed partial class MainWindow
             progressTimer.Stop();
             playbackStarted = false;
             _playback.ClearSource();
-            await LoadCurrentStreamAsync(playbackGeneration, playbackCancellation.Token);
+            await LoadCurrentStreamAsync(playbackGeneration, currentPlaybackCancellation.Token);
         }
 
         async Task LoadCurrentStreamAsync(int generation, CancellationToken cancellationToken)

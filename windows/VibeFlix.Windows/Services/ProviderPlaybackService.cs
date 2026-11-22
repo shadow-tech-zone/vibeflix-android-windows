@@ -492,7 +492,7 @@ public sealed class ProviderPlaybackService : IDisposable
 
     private static byte[] DecodeBase64Url(string value)
     {
-        var normalized = value.Trim().Replace('"', string.Empty).Replace('-', '+').Replace('_', '/');
+        var normalized = value.Trim().Replace("\"", string.Empty).Replace('-', '+').Replace('_', '/');
         normalized = normalized.TrimEnd('=');
         normalized = normalized.PadRight(normalized.Length + ((4 - normalized.Length % 4) % 4), '=');
         return Convert.FromBase64String(normalized);
