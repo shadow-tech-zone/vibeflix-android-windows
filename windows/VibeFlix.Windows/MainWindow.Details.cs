@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using VibeFlix.Windows.Models;
+using VibeFlix.Windows.Services;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Media.Core;
