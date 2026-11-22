@@ -4,7 +4,6 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Input;
 using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
-using Windows.Storage;
 using Windows.System;
 
 namespace VibeFlix.Windows;
@@ -13,8 +12,24 @@ public sealed partial class MainWindow : Window
 {
     private readonly LocalLibraryStore _library = new();
     private readonly WindowsPlaybackService _playback = new();
-    private readonly Dictionary<string, StorageFile> _sessionMediaFiles = new(StringComparer.Ordinal);
-    private readonly IReadOnlyList<CatalogTitle> _catalog = DemoCatalog.Titles;
+    private readonly CatalogSourceService _catalogSources = new();
+    private readonly ProviderPlaybackService _providerPlayback = new();
+    private readonly Dictionary<string, CatalogTitle> _titleCache = new(StringComparer.Ordinal);
+    private IReadOnlyList<CatalogTitle> _catalog = Array.Empty<CatalogTitle>();
+    private CancellationTokenSource? _activeCatalogRequest;
+    private CancellationTokenSource? _searchDebounce;
+    private IReadOnlyList<CatalogSourceService.CatalogCategory> _server1Categories = Array.Empty<CatalogSourceService.CatalogCategory>();
+    private int _catalogRequestVersion;
+    private int _catalogPage = 1;
+    private bool _catalogLoading;
+    private bool _catalogHasNext;
+    private bool _catalogServer2Fallback;
+    private bool _server1OnlyCategory;
+    private string? _activeCategoryKey;
+    private string? _activeCategoryValue;
+    private string? _catalogError;
+    private bool _server1Unavailable;
+    private bool _server2Unavailable;
     private string _currentPage = "Home";
     private string _activeFilter = "All";
     private string? _activeGenre;
@@ -27,6 +42,11 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        foreach (var title in _library.GetKnownTitles())
+        {
+            _titleCache[title.Id] = title;
+        }
+
         Title = "VibeFlix";
         Closed += (_, _) =>
         {
@@ -39,12 +59,17 @@ public sealed partial class MainWindow : Window
             }
             finally
             {
-                _sessionMediaFiles.Clear();
+                _activeCatalogRequest?.Cancel();
+                _searchDebounce?.Cancel();
+                _catalogSources.Dispose();
+                _providerPlayback.Dispose();
                 _playback.Dispose();
             }
         };
+        _rendering = true;
         ServerPicker.SelectedIndex = 0;
-        RenderCurrentPage(resetScroll: true);
+        _rendering = false;
+        _ = LoadCatalogAsync(resetScroll: true);
     }
 
     private void NavigationButton_Click(object sender, RoutedEventArgs e)
@@ -59,13 +84,35 @@ public sealed partial class MainWindow : Window
             _currentPage = "Home";
             _activeFilter = destination;
             _activeGenre = null;
+            _activeCategoryKey = null;
+            _activeCategoryValue = null;
+            _catalogPage = 1;
             SetSearchTextSilently(string.Empty);
             UpdateNavigationState();
-            RenderCurrentPage(resetScroll: true);
+            _ = LoadCatalogAsync(resetScroll: true);
             return;
         }
 
         NavigateTo(destination);
+    }
+
+    private void MoreNavigationButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement target)
+        {
+            return;
+        }
+
+        var menu = new MenuFlyout();
+        var historyItem = new MenuFlyoutItem { Text = "History" };
+        historyItem.Click += (_, _) => NavigateTo("History");
+        menu.Items.Add(historyItem);
+
+        var settingsItem = new MenuFlyoutItem { Text = "Settings" };
+        settingsItem.Click += (_, _) => NavigateTo("Settings");
+        menu.Items.Add(settingsItem);
+
+        menu.ShowAt(target);
     }
 
     private void NavigateTo(string destination)
@@ -73,6 +120,9 @@ public sealed partial class MainWindow : Window
         _currentPage = destination;
         _activeFilter = "All";
         _activeGenre = null;
+        _activeCategoryKey = null;
+        _activeCategoryValue = null;
+        _catalogPage = 1;
 
         if (!string.Equals(destination, "Search", StringComparison.Ordinal))
         {
@@ -80,7 +130,14 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateNavigationState();
-        RenderCurrentPage(resetScroll: true);
+        if (destination is "Home" or "Search")
+        {
+            _ = LoadCatalogAsync(resetScroll: true);
+        }
+        else
+        {
+            RenderCurrentPage(resetScroll: true);
+        }
 
         if (string.Equals(destination, "Search", StringComparison.Ordinal))
         {
@@ -105,7 +162,34 @@ public sealed partial class MainWindow : Window
 
         if (_currentPage == "Search")
         {
+            _catalogPage = 1;
+            ScheduleCatalogSearch();
             RenderCurrentPage(resetScroll: false);
+        }
+    }
+
+    private void ScheduleCatalogSearch()
+    {
+        _searchDebounce?.Cancel();
+        _searchDebounce?.Dispose();
+        var debounce = new CancellationTokenSource();
+        _searchDebounce = debounce;
+        _ = DebouncedCatalogSearchAsync(debounce);
+    }
+
+    private async Task DebouncedCatalogSearchAsync(CancellationTokenSource debounce)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(350), debounce.Token);
+            if (!_windowClosed && ReferenceEquals(_searchDebounce, debounce) && _currentPage == "Search")
+            {
+                await LoadCatalogAsync(resetScroll: false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer keystroke or navigation superseded this debounce timer.
         }
     }
 
@@ -119,7 +203,8 @@ public sealed partial class MainWindow : Window
                 UpdateNavigationState();
             }
 
-            RenderCurrentPage(resetScroll: true);
+            _catalogPage = 1;
+            _ = LoadCatalogAsync(resetScroll: true);
             e.Handled = true;
         }
         else if (e.Key == VirtualKey.Escape && !string.IsNullOrEmpty(SearchBox.Text))
@@ -127,7 +212,8 @@ public sealed partial class MainWindow : Window
             SetSearchTextSilently(string.Empty);
             if (_currentPage == "Search")
             {
-                RenderCurrentPage(resetScroll: true);
+                _catalogPage = 1;
+                _ = LoadCatalogAsync(resetScroll: true);
             }
 
             e.Handled = true;
@@ -136,18 +222,165 @@ public sealed partial class MainWindow : Window
 
     private void ServerPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_rendering)
+        if (_rendering || _windowClosed)
+        {
+            return;
+        }
+
+        _catalogPage = 1;
+        if (_currentPage is "Home" or "Search")
+        {
+            _ = LoadCatalogAsync(resetScroll: false);
+        }
+        else
         {
             RenderCurrentPage(resetScroll: false);
         }
     }
 
+    private async Task LoadCatalogAsync(bool resetScroll)
+    {
+        if (_windowClosed)
+        {
+            return;
+        }
+
+        _activeCatalogRequest?.Cancel();
+        _activeCatalogRequest?.Dispose();
+        var requestCancellation = new CancellationTokenSource();
+        _activeCatalogRequest = requestCancellation;
+        var requestVersion = ++_catalogRequestVersion;
+        var requestQuery = _currentPage == "Search" ? SearchBox.Text.Trim() : string.Empty;
+        var sourceIndex = Math.Clamp(ServerPicker.SelectedIndex, 0, 2);
+
+        _catalogLoading = true;
+        _catalog = Array.Empty<CatalogTitle>();
+        _catalogError = null;
+        _catalogHasNext = false;
+        _catalogServer2Fallback = false;
+        _server1OnlyCategory = false;
+        _server1Unavailable = false;
+        _server2Unavailable = false;
+        RenderCurrentPage(resetScroll);
+
+        try
+        {
+            var result = await _catalogSources.BrowseAsync(
+                sourceIndex,
+                _activeFilter,
+                requestQuery,
+                _catalogPage,
+                _activeCategoryKey,
+                _activeCategoryValue,
+                requestCancellation.Token);
+            if (requestVersion != _catalogRequestVersion || _windowClosed)
+            {
+                return;
+            }
+
+            _catalog = result.Titles;
+            RememberTitles(result.Titles);
+            _catalogHasNext = result.HasNext;
+            _catalogServer2Fallback = result.Server2WebsiteFallback;
+            _server1OnlyCategory = result.Server1OnlyCategory;
+            _server1Unavailable = result.Server1Unavailable;
+            _server2Unavailable = result.Server2Unavailable;
+
+            if (result.Server1OnlyCategory && sourceIndex == 2)
+            {
+                _catalogError = "This category is available from Server 1. Select Server 1 or Both Servers to browse it.";
+            }
+            else if (result.Titles.Count == 0 && result.Server1Unavailable && result.Server2Unavailable)
+            {
+                _catalogError = "Both catalog sources are unavailable right now. Check your connection and retry.";
+            }
+            else if (result.Titles.Count == 0 && sourceIndex == 1 && result.Server1Unavailable)
+            {
+                _catalogError = "Server 1 is unavailable right now. Check your connection and retry.";
+            }
+            else if (result.Titles.Count == 0 && sourceIndex == 2 && result.Server2Unavailable)
+            {
+                _catalogError = "Server 2 is unavailable right now. Check your connection and retry.";
+            }
+            else if (result.Titles.Count == 0 && sourceIndex == 0
+                && (result.Server1Unavailable || result.Server2Unavailable))
+            {
+                _catalogError = "The selected sources could not load titles. Check your connection and retry.";
+            }
+        }
+        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception)
+        {
+            if (requestVersion == _catalogRequestVersion)
+            {
+                _catalogError = "VibeFlix could not load the catalog. Check your connection and retry.";
+            }
+        }
+        finally
+        {
+            if (requestVersion == _catalogRequestVersion)
+            {
+                _catalogLoading = false;
+                if (ReferenceEquals(_activeCatalogRequest, requestCancellation))
+                {
+                    _activeCatalogRequest = null;
+                }
+
+                RenderCurrentPage(resetScroll: false);
+            }
+
+            requestCancellation.Dispose();
+        }
+    }
+
+    private void RememberTitles(IEnumerable<CatalogTitle> titles)
+    {
+        foreach (var freshTitle in titles)
+        {
+            var title = freshTitle;
+            if (_titleCache.TryGetValue(freshTitle.Id, out var existing))
+            {
+                title = freshTitle with
+                {
+                    Rating = string.IsNullOrWhiteSpace(freshTitle.Rating) ? existing.Rating : freshTitle.Rating,
+                    RuntimeMinutes = freshTitle.RuntimeMinutes > 0 ? freshTitle.RuntimeMinutes : existing.RuntimeMinutes,
+                    Synopsis = string.IsNullOrWhiteSpace(freshTitle.Synopsis) ? existing.Synopsis : freshTitle.Synopsis,
+                    Language = string.IsNullOrWhiteSpace(freshTitle.Language) ? existing.Language : freshTitle.Language,
+                    Genres = freshTitle.Genres.Count == 0 ? existing.Genres : freshTitle.Genres,
+                    Seasons = freshTitle.Seasons.Count == 0 ? existing.Seasons : freshTitle.Seasons,
+                    PosterUrl = string.IsNullOrWhiteSpace(freshTitle.PosterUrl) ? existing.PosterUrl : freshTitle.PosterUrl,
+                    IsNew = freshTitle.IsNew || existing.IsNew
+                };
+            }
+
+            _titleCache[title.Id] = title;
+            if (_library.IsKnownTitle(title.Id))
+            {
+                _library.UpsertTitle(title);
+            }
+        }
+    }
+
+    private void ChangeCatalogPage(int offset)
+    {
+        var target = _catalogPage + offset;
+        if (target < 1 || (offset > 0 && !_catalogHasNext))
+        {
+            return;
+        }
+
+        _catalogPage = target;
+        _ = LoadCatalogAsync(resetScroll: true);
+    }
+
     private void AppRoot_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        BrandSubtitle.Visibility = e.NewSize.Width < 960 ? Visibility.Collapsed : Visibility.Visible;
-        PreviewBadge.Visibility = e.NewSize.Width < 930 ? Visibility.Collapsed : Visibility.Visible;
-        SearchBox.Width = e.NewSize.Width < 680 ? 126 : e.NewSize.Width < 900 ? 190 : 270;
-        ServerPicker.Width = e.NewSize.Width < 680 ? 112 : e.NewSize.Width < 900 ? 128 : 148;
+        PreviewBadge.Visibility = e.NewSize.Width < 1020 ? Visibility.Collapsed : Visibility.Visible;
+        SearchBox.Width = e.NewSize.Width < 820 ? 128 : e.NewSize.Width < 1120 ? 170 : 220;
+        ServerPicker.Width = e.NewSize.Width < 820 ? 106 : e.NewSize.Width < 1120 ? 124 : 140;
     }
 
     private void PageScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -216,28 +449,53 @@ public sealed partial class MainWindow : Window
         var visible = GetVisibleCatalog();
         if (visible.Count == 0)
         {
+            var waitingForSearch = _currentPage == "Search" && !string.IsNullOrWhiteSpace(SearchBox.Text);
             PageContent.Children.Add(CreatePageHeader(
-                "VIBEFLIX  /  SAMPLE CATALOGUE",
-                "Nothing matches this view.",
-                "Try another source, category, or genre to see more of the fictional sample catalogue."));
+                "VIBEFLIX  /  DISCOVER",
+                _catalogLoading ? "Loading titles…" : waitingForSearch ? "Searching the selected source…" : "Browse VibeFlix titles.",
+                "Choose a provider, browse a category, or search the same resources used by the Android app."));
             PageContent.Children.Add(CreatePreviewNotice());
+            if (_catalogLoading)
+            {
+                PageContent.Children.Add(CreateCompactEmptyState("Loading provider catalog…", "Fetching current titles and posters from the selected source."));
+                return;
+            }
+
+            if (_catalogError is not null)
+            {
+                PageContent.Children.Add(CreateEmptyState(
+                    "Catalog unavailable.",
+                    _catalogError,
+                    "Retry",
+                    () => _ = LoadCatalogAsync(resetScroll: false)));
+                return;
+            }
+
             PageContent.Children.Add(CreateEmptyState(
-                "No titles match these filters.",
-                "Clear the selected filters to return to the featured sample titles.",
+                "No titles match this view.",
+                "Try another source or category, or clear the active filters.",
                 "Clear filters",
                 () =>
                 {
-                    ServerPicker.SelectedIndex = 0;
                     _activeFilter = "All";
                     _activeGenre = null;
-                    RenderCurrentPage(resetScroll: true);
+                    _activeCategoryKey = null;
+                    _activeCategoryValue = null;
+                    _catalogPage = 1;
+                    if (ServerPicker.SelectedIndex != 0)
+                    {
+                        ServerPicker.SelectedIndex = 0;
+                    }
+                    else
+                    {
+                        _ = LoadCatalogAsync(resetScroll: true);
+                    }
                 }));
             return;
         }
 
-        var featured = visible.FirstOrDefault(title => title.Id == "the-glass-orbit") ?? visible[0];
+        var featured = visible[0];
         PageContent.Children.Add(CreateHero(featured));
-        PageContent.Children.Add(CreatePreviewNotice());
         PageContent.Children.Add(CreateBrowseFilters());
 
         var progress = GetVisibleProgress()
@@ -259,34 +517,35 @@ public sealed partial class MainWindow : Window
         }
 
         var isUnfilteredHome = _activeGenre is null && _activeFilter == "All";
-        PageContent.Children.Add(CreateSectionHeading(
-            isUnfilteredHome ? "Featured sample titles" : _activeGenre ?? _activeFilter,
-            $"{visible.Count} SAMPLE TITLES"));
+        var sectionTitle = _activeGenre ?? _activeFilter switch
+        {
+            "All" => "Explore titles",
+            "Latest" => "Latest titles",
+            "Hindi" => "Hindi titles",
+            "Category" => "Category results",
+            _ => _activeFilter
+        };
+        PageContent.Children.Add(CreateSectionHeading(sectionTitle, $"{visible.Count} TITLES  ·  PAGE {_catalogPage}"));
         PageContent.Children.Add(CreateTitleShelf(visible.Take(8).ToArray()));
 
         if (isUnfilteredHome)
         {
-            var newTitles = visible.Where(title => title.IsNew).ToArray();
-            if (newTitles.Length > 0)
-            {
-                PageContent.Children.Add(CreateSectionHeading("New in this sample", "FICTIONAL CATALOGUE"));
-                PageContent.Children.Add(CreateTitleShelf(newTitles));
-            }
-
             var series = visible.Where(title => title.IsSeries).ToArray();
             if (series.Length > 0)
             {
-                PageContent.Children.Add(CreateSectionHeading("Series", $"{series.Length} SAMPLE TITLES"));
+                PageContent.Children.Add(CreateSectionHeading("Series", $"{series.Length} ON THIS PAGE"));
                 PageContent.Children.Add(CreateTitleShelf(series));
             }
 
             var movies = visible.Where(title => !title.IsSeries).ToArray();
             if (movies.Length > 0)
             {
-                PageContent.Children.Add(CreateSectionHeading("Movies", $"{movies.Length} SAMPLE TITLES"));
+                PageContent.Children.Add(CreateSectionHeading("Movies", $"{movies.Length} ON THIS PAGE"));
                 PageContent.Children.Add(CreateTitleShelf(movies));
             }
         }
+
+        PageContent.Children.Add(CreateCatalogPageNavigation());
     }
 
     private void RenderSearch()
@@ -295,37 +554,66 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "SEARCH  /  CATALOGUE",
             query.Length == 0 ? "Find your next watch." : $"Results for “{query}”",
-            "Search the local preview catalogue by title, genre, language, or source."));
+            "Search the selected Server 1 and Server 2 resources used by VibeFlix on Android."));
         PageContent.Children.Add(CreatePreviewNotice());
         PageContent.Children.Add(CreateBrowseFilters());
 
         var results = GetVisibleCatalog();
-        if (query.Length == 0)
+        if (_catalogLoading && results.Count == 0)
         {
-            PageContent.Children.Add(CreateSectionHeading("Start with a category", "BROWSE WITHOUT A QUERY"));
-            PageContent.Children.Add(CreateCategoryShortcuts());
-            PageContent.Children.Add(CreateSectionHeading("All preview titles", $"{results.Count} TITLES"));
-            PageContent.Children.Add(CreateResponsiveTitleGrid(results));
+            PageContent.Children.Add(CreateCompactEmptyState(
+                "Searching provider catalog…",
+                query.Length == 0 ? "Loading current titles from the selected source." : "Waiting for matching results."));
             return;
         }
 
-        PageContent.Children.Add(CreateSectionHeading("Search results", $"{results.Count} MATCHES"));
+        if (_catalogError is not null && results.Count == 0)
+        {
+            PageContent.Children.Add(CreateEmptyState(
+                "Search is unavailable.",
+                _catalogError,
+                "Retry",
+                () => _ = LoadCatalogAsync(resetScroll: false)));
+            return;
+        }
+
+        if (query.Length == 0)
+        {
+            PageContent.Children.Add(CreateSectionHeading("Start with a provider category", "BROWSE LIVE TITLES"));
+            PageContent.Children.Add(CreateCategoryShortcuts());
+            if (results.Count == 0)
+            {
+                PageContent.Children.Add(CreateCompactEmptyState(
+                    "No catalog titles loaded yet.",
+                    "Choose a category above or retry the selected source."));
+                return;
+            }
+
+            PageContent.Children.Add(CreateSectionHeading("Browse results", $"{results.Count} TITLES  ·  PAGE {_catalogPage}"));
+            PageContent.Children.Add(CreateResponsiveTitleGrid(results));
+            PageContent.Children.Add(CreateCatalogPageNavigation());
+            return;
+        }
+
+        PageContent.Children.Add(CreateSectionHeading("Search results", $"{results.Count} MATCHES  ·  PAGE {_catalogPage}"));
         if (results.Count == 0)
         {
             PageContent.Children.Add(CreateEmptyState(
                 "No matching titles yet.",
-                "Try a different word, genre, language, or source. Search currently uses sample data only.",
+                "Try a different title or choose another content source.",
                 "Clear search",
                 () =>
                 {
                     SetSearchTextSilently(string.Empty);
-                    RenderCurrentPage(resetScroll: true);
+                    _catalogPage = 1;
+                    _ = LoadCatalogAsync(resetScroll: true);
                     SearchBox.Focus(FocusState.Programmatic);
                 }));
             return;
         }
 
         PageContent.Children.Add(CreateResponsiveTitleGrid(results));
+        PageContent.Children.Add(CreateCatalogPageNavigation());
     }
 
     private void RenderMyList()
@@ -334,14 +622,14 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "YOUR LIBRARY  /  SAVED",
             "My List",
-            "Titles you save here are stored locally on this device."));
+            "Titles you save here are stored on this device; Android-style opt-in cloud sync is not wired into this Windows build yet."));
         PageContent.Children.Add(CreatePreviewNotice());
 
         if (titles.Count == 0)
         {
             PageContent.Children.Add(CreateEmptyState(
                 "Your list is ready for a first title.",
-                "Save something from the preview catalogue. The list stays local; cloud sync is not connected in this Windows build.",
+                "Browse the live provider catalog and save a movie or series. Your local list remains available when a source is offline.",
                 "Browse titles",
                 () => NavigateTo("Home")));
             return;
@@ -357,14 +645,14 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "YOUR LIBRARY  /  RESUME",
             "Continue watching",
-            "Playback positions are stored per episode on this device. Media files are not copied, uploaded, or remembered after the app closes."));
+            "Resume positions are stored per provider title and episode on this device. Stream addresses and provider credentials are not saved."));
         PageContent.Children.Add(CreatePreviewNotice());
 
         if (progress.Count == 0)
         {
             PageContent.Children.Add(CreateEmptyState(
                 "Nothing to resume yet.",
-                "Choose a local video from a title's player view. When you resume, select the same file again; its path is never stored.",
+                "Start watching a movie or episode from a provider title. Windows will add a resume marker when playback progress is available.",
                 "Browse titles",
                 () => NavigateTo("Home")));
             return;
@@ -380,14 +668,14 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "YOUR LIBRARY  /  RECENT",
             "History",
-            "Movies and final episodes completed in local playback, plus titles you marked watched manually, appear here."));
+            "Movies and completed series episodes watched through a provider, plus titles you marked watched manually, appear here."));
         PageContent.Children.Add(CreatePreviewNotice());
 
         if (history.Count == 0)
         {
             PageContent.Children.Add(CreateEmptyState(
                 "Your history is empty.",
-                "Complete a local movie or series finale, or mark a title watched manually from its details.",
+                "Finish a movie or mark a title watched manually from its details.",
                 "Browse titles",
                 () => NavigateTo("Home")));
             return;
@@ -409,29 +697,36 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "PREFERENCES  /  DEVICE",
             "Settings",
-            "Local library controls and the current Windows integration status."));
+            "Local library controls and content-source status."));
         PageContent.Children.Add(CreatePreviewNotice());
 
         var localCard = CreateSettingsCard(
             "Local library",
-            "My List, History, and per-episode playback positions are stored on this device. Media file paths, stream addresses, and provider credentials are not saved.",
+            "My List, History, provider title metadata, and per-episode resume positions are stored on this device. Stream URLs and provider credentials are never saved.",
             out var localCardContent);
         localCardContent.Children.Add(CreateSettingsDetail("Storage file", _library.StorageLocation));
         var localActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 12, 0, 0) };
         localActions.Children.Add(CreateActionButton("Clear history", async () => await ConfirmClearHistoryAsync()));
-        localActions.Children.Add(CreateActionButton("Reset local preview data", async () => await ConfirmClearLibraryAsync(), isPrimary: false));
+        localActions.Children.Add(CreateActionButton("Clear local library", async () => await ConfirmClearLibraryAsync(), isPrimary: false));
         localCardContent.Children.Add(localActions);
         PageContent.Children.Add(localCard);
 
         var integrationCard = CreateSettingsCard(
             "Connections",
-            "Server 1 / Server 2 currently filter fictional catalogue entries. Playback is limited to local files you select; provider catalogue browsing and stream resolution are not connected.",
+            "The Windows app uses the same Server 1 and Server 2 catalog and playback resources as Android. A stream address is resolved only after you choose Play.",
             out var integrationCardContent);
-        integrationCardContent.Children.Add(CreateStatusLine("Catalogue providers", "Not connected", "#DDBB85"));
-        integrationCardContent.Children.Add(CreateStatusLine("Local file playback", "Available", "#A8D8BD"));
-        integrationCardContent.Children.Add(CreateStatusLine("Account and cloud sync", "Not connected", "#AEB8C8"));
+        integrationCardContent.Children.Add(CreateStatusLine(
+            "Server 1 catalog",
+            _server1Unavailable ? "Unavailable" : "Connected",
+            _server1Unavailable ? "#E3A77B" : "#A8D8BD"));
+        integrationCardContent.Children.Add(CreateStatusLine(
+            "Server 2 catalog",
+            _server2Unavailable ? "Unavailable" : "Connected",
+            _server2Unavailable ? "#E3A77B" : "#A8D8BD"));
+        integrationCardContent.Children.Add(CreateStatusLine("Provider stream playback", "Available on demand", "#A8D8BD"));
+        integrationCardContent.Children.Add(CreateStatusLine("Android account and cloud sync", "Not connected in Windows", "#AEB8C8"));
         integrationCardContent.Children.Add(CreateText(
-            "Signing in will not upload or sync anything in this build. The existing local-first, explicit-consent boundary remains unchanged.",
+            "Library sync is not implemented in this Windows milestone. Android remains opt-in and user-triggered; this app does not sync in the background.",
             13, "#9DA8B9", TextWrapping.Wrap));
         PageContent.Children.Add(integrationCard);
 
@@ -471,30 +766,21 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    private IEnumerable<CatalogTitle> ApplyBrowseFilter(IEnumerable<CatalogTitle> titles)
+    private IEnumerable<CatalogTitle> ApplyBrowseFilter(IEnumerable<CatalogTitle> titles) => _activeFilter switch
     {
-        if (_activeGenre is not null)
-        {
-            return titles.Where(title => title.Genres.Contains(_activeGenre, StringComparer.OrdinalIgnoreCase));
-        }
-
-        return _activeFilter switch
-        {
-            "Movies" => titles.Where(title => !title.IsSeries),
-            "Series" => titles.Where(title => title.IsSeries),
-            "Latest" => titles.Where(title => title.IsNew),
-            "Hindi" => titles.Where(title => string.Equals(title.Language, "Hindi", StringComparison.OrdinalIgnoreCase)),
-            _ => titles
-        };
-    }
+        "Movies" => titles.Where(title => !title.IsSeries),
+        "Series" => titles.Where(title => title.IsSeries),
+        _ => titles
+    };
 
     private bool MatchesActiveBrowseFilter(CatalogTitle title) =>
         ApplyBrowseFilter(new[] { title }).Any();
 
     private IReadOnlyList<CatalogTitle> GetVisibleSavedTitles()
     {
-        var visibleById = ApplySourceFilter(_catalog)
-            .ToDictionary(title => title.Id, StringComparer.Ordinal);
+        var visibleById = ApplySourceFilter(_titleCache.Values)
+            .GroupBy(title => title.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         return _library.GetMyListIds()
             .Where(visibleById.ContainsKey)
             .Select(id => visibleById[id])
@@ -503,7 +789,7 @@ public sealed partial class MainWindow : Window
 
     private IReadOnlyList<(ProgressEntry Progress, CatalogTitle Title)> GetVisibleProgress()
     {
-        var titles = _catalog.ToDictionary(title => title.Id, StringComparer.Ordinal);
+        var titles = _titleCache;
         return _library.GetContinueWatching()
             .Where(progress => titles.ContainsKey(progress.TitleId))
             .Where(progress => SourceMatches(titles[progress.TitleId]))
@@ -513,7 +799,7 @@ public sealed partial class MainWindow : Window
 
     private IReadOnlyList<(HistoryEntry History, CatalogTitle Title)> GetVisibleHistory()
     {
-        var titles = _catalog.ToDictionary(title => title.Id, StringComparer.Ordinal);
+        var titles = _titleCache;
         return _library.GetHistory()
             .Where(history => titles.ContainsKey(history.TitleId))
             .Where(history => SourceMatches(titles[history.TitleId]))
@@ -538,10 +824,17 @@ public sealed partial class MainWindow : Window
         _suppressSearchEvents = false;
     }
 
-    private void SetBrowseFilter(string filter, string? genre = null)
+    private void SetBrowseFilter(
+        string filter,
+        string? categoryName = null,
+        string? categoryKey = null,
+        string? categoryValue = null)
     {
         _activeFilter = filter;
-        _activeGenre = genre;
+        _activeGenre = filter == "Category" ? categoryName : null;
+        _activeCategoryKey = categoryKey;
+        _activeCategoryValue = categoryValue;
+        _catalogPage = 1;
         if (_currentPage is not "Home" and not "Search")
         {
             _currentPage = "Home";
@@ -549,27 +842,30 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateNavigationState();
-        RenderCurrentPage(resetScroll: true);
+        _ = LoadCatalogAsync(resetScroll: true);
     }
 
     private void UpdateNavigationState()
     {
-        var selectedPage = _currentPage == "Home"
-            ? _activeGenre is null && (_activeFilter is "Movies" or "Series")
-                ? _activeFilter
-                : "Home"
-            : _currentPage;
+        var selectedPage = _currentPage switch
+        {
+            "History" or "Settings" => "More",
+            "Home" when _activeGenre is null && (_activeFilter is "Movies" or "Series") => _activeFilter,
+            "Home" => "Home",
+            _ => _currentPage
+        };
 
         foreach (var button in NavigationButtons())
         {
             var selected = string.Equals(button.Tag as string, selectedPage, StringComparison.Ordinal);
-            button.Background = Brush(selected ? "#191919" : "#00000000");
-            button.BorderBrush = Brush(selected ? "#E34855" : "#00000000");
+            button.Background = Brush("#00000000");
+            button.BorderBrush = Brush("#00000000");
+            button.BorderThickness = new Thickness(0);
             button.Foreground = Brush(selected ? "#FFFFFF" : "#B3B3B3");
             button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
         }
     }
 
     private IEnumerable<Button> NavigationButtons() =>
-        new[] { HomeNav, SeriesNav, MoviesNav, SearchNav, MyListNav, ContinueNav, HistoryNav, SettingsNav };
+        new[] { HomeNav, SeriesNav, MoviesNav, SearchNav, MyListNav, ContinueNav, MoreNav };
 }

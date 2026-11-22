@@ -1,3 +1,4 @@
+using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
 
 var root = Path.Combine(Path.GetTempPath(), "VibeFlix.LocalLibraryStoreTests", Guid.NewGuid().ToString("N"));
@@ -8,6 +9,7 @@ try
     VerifyEpisodeProgressIsIndependentAndPersistent(root);
     VerifyEpisodeAndTitleCompletion(root);
     VerifyLegacyProgressLoads(root);
+    VerifyCatalogTitlePersistence(root);
     Console.WriteLine("LocalLibraryStore tests passed.");
 }
 finally
@@ -88,6 +90,60 @@ static void VerifyLegacyProgressLoads(string root)
     var store = new LocalLibraryStore(directory);
     Check(store.GetProgress("legacy", null) is { EpisodeKey: "", Percent: 35, IsPreviewMarker: true },
         "Existing progress entries without episode keys should remain readable.");
+}
+
+static void VerifyCatalogTitlePersistence(string root)
+{
+    var directory = Path.Combine(root, "catalog-title");
+    var store = new LocalLibraryStore(directory);
+    var genres = new List<string> { "Drama", "Mystery" };
+    var title = new CatalogTitle(
+        Id: "server1-series-example",
+        Name: "The Indigo Thread",
+        Kind: "Series",
+        Year: 2025,
+        Rating: string.Empty,
+        RuntimeMinutes: 0,
+        Synopsis: "A catalog synopsis.",
+        Language: "English",
+        Source: "Server 1",
+        Genres: genres,
+        AccentStart: "#343434",
+        AccentEnd: "#161616",
+        Seasons: [new MediaSeason(1, [new MediaEpisode(1, "Pilot", "", 0, "/series/example/s-1/ep-1")], "/series/example/s-1/ep-1")],
+        CatalogPath: "/series/example",
+        PosterUrl: "https://play4u.org/assets/example.jpg");
+
+    store.UpsertTitle(title);
+    var rejectedStreamPath = false;
+    try
+    {
+        store.UpsertTitle(title with { CatalogPath = "/stream/example.m3u8" });
+    }
+    catch (ArgumentException)
+    {
+        rejectedStreamPath = true;
+    }
+
+    Check(rejectedStreamPath, "Only known provider catalog page paths may be cached as title metadata.");
+    genres[0] = "Mutated source list";
+    var cachedTitle = store.GetKnownTitles().Single();
+    Check(cachedTitle.Name == title.Name && cachedTitle.Genres[0] == "Drama"
+        && cachedTitle.Seasons[0].Episodes[0].CatalogPath == "/series/example/s-1/ep-1",
+        "Known provider titles should persist metadata as defensive copies.");
+
+    var reloaded = new LocalLibraryStore(directory);
+    Check(reloaded.IsKnownTitle(title.Id)
+        && reloaded.GetKnownTitles().Single().CatalogPath == title.CatalogPath,
+        "Known provider metadata should survive reloading the local library.");
+    var json = File.ReadAllText(reloaded.StorageLocation);
+    Check(!json.Contains(".m3u8", StringComparison.OrdinalIgnoreCase)
+        && !json.Contains("seed=", StringComparison.OrdinalIgnoreCase),
+        "The local library must not persist resolved stream addresses or seed values.");
+
+    reloaded.ClearLibrary();
+    Check(reloaded.GetKnownTitles().Count == 0 && !reloaded.IsKnownTitle(title.Id),
+        "Clearing the local library should also remove cached provider title metadata.");
 }
 
 static void Check(bool condition, string message)

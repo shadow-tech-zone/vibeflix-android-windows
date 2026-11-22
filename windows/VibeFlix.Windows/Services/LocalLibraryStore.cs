@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using VibeFlix.Windows.Models;
 
 namespace VibeFlix.Windows.Services;
 
@@ -44,6 +46,39 @@ public sealed class LocalLibraryStore
         lock (_gate)
         {
             return _state.MyList.ToArray();
+        }
+    }
+
+    public bool IsKnownTitle(string titleId)
+    {
+        lock (_gate)
+        {
+            return _state.Titles.Any(title => string.Equals(title.Id, titleId, StringComparison.Ordinal));
+        }
+    }
+
+    public IReadOnlyList<CatalogTitle> GetKnownTitles()
+    {
+        lock (_gate)
+        {
+            return _state.Titles.Select(CloneTitle).ToArray();
+        }
+    }
+
+    public void UpsertTitle(CatalogTitle title)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+        if (string.IsNullOrWhiteSpace(title.Id) || string.IsNullOrWhiteSpace(title.Name)
+            || !IsValidCatalogPath(title.Source, title.CatalogPath))
+        {
+            throw new ArgumentException("Only provider catalog metadata can be saved.", nameof(title));
+        }
+
+        lock (_gate)
+        {
+            _state.Titles.RemoveAll(existing => string.Equals(existing.Id, title.Id, StringComparison.Ordinal));
+            _state.Titles.Insert(0, CloneTitle(title));
+            SaveState();
         }
     }
 
@@ -103,8 +138,8 @@ public sealed class LocalLibraryStore
     }
 
     /// <summary>
-    /// Persists real local-file playback progress by title and episode. The media file path is
-    /// deliberately not stored; the user chooses the file again when resuming on this device.
+    /// Persists provider playback progress by title and episode. Resolved stream URLs, headers,
+    /// provider credentials, and media paths are deliberately never stored.
     /// </summary>
     public void SavePlaybackProgress(
         string titleId,
@@ -185,6 +220,7 @@ public sealed class LocalLibraryStore
         lock (_gate)
         {
             _state.History.RemoveAll(entry => string.Equals(entry.TitleId, titleId, StringComparison.Ordinal));
+            _state.Progress.RemoveAll(entry => string.Equals(entry.TitleId, titleId, StringComparison.Ordinal));
             SaveState();
         }
     }
@@ -193,7 +229,11 @@ public sealed class LocalLibraryStore
     {
         lock (_gate)
         {
+            var clearedTitleIds = _state.History
+                .Select(entry => entry.TitleId)
+                .ToHashSet(StringComparer.Ordinal);
             _state.History.Clear();
+            _state.Progress.RemoveAll(entry => clearedTitleIds.Contains(entry.TitleId));
             SaveState();
         }
     }
@@ -221,6 +261,10 @@ public sealed class LocalLibraryStore
             state.MyList ??= [];
             state.History ??= [];
             state.Progress ??= [];
+            state.Titles ??= [];
+            state.Titles = state.Titles
+                .Where(title => title is not null && IsValidCatalogPath(title.Source, title.CatalogPath))
+                .ToList();
             foreach (var progress in state.Progress)
             {
                 progress.EpisodeKey ??= string.Empty;
@@ -234,6 +278,43 @@ public sealed class LocalLibraryStore
             return new LibraryState();
         }
     }
+
+    private static bool IsValidCatalogPath(string source, string catalogPath)
+    {
+        if (string.IsNullOrWhiteSpace(catalogPath))
+        {
+            return false;
+        }
+
+        return source switch
+        {
+            "Server 1" => Regex.IsMatch(catalogPath, @"^/(watch|series)/[A-Za-z0-9._~-]{1,200}$", RegexOptions.CultureInvariant),
+            "Server 2" => Regex.IsMatch(catalogPath, @"^/(movie|tv)/[0-9]{1,12}$", RegexOptions.CultureInvariant),
+            _ => false
+        };
+    }
+
+    private static CatalogTitle CloneTitle(CatalogTitle title) => new(
+        Id: title.Id,
+        Name: title.Name,
+        Kind: title.Kind,
+        Year: title.Year,
+        Rating: title.Rating,
+        RuntimeMinutes: title.RuntimeMinutes,
+        Synopsis: title.Synopsis,
+        Language: title.Language,
+        Source: title.Source,
+        Genres: title.Genres.ToArray(),
+        AccentStart: title.AccentStart,
+        AccentEnd: title.AccentEnd,
+        IsNew: title.IsNew,
+        Seasons: title.Seasons.Select(season => new MediaSeason(
+            season.Number,
+            season.Episodes.Select(episode => episode with { }).ToArray(),
+            season.Path,
+            season.Name)).ToArray(),
+        CatalogPath: title.CatalogPath,
+        PosterUrl: title.PosterUrl);
 
     private static ProgressEntry CloneProgress(ProgressEntry entry) => new()
     {
@@ -261,6 +342,7 @@ public sealed class LocalLibraryStore
         public List<string> MyList { get; set; } = [];
         public List<HistoryEntry> History { get; set; } = [];
         public List<ProgressEntry> Progress { get; set; } = [];
+        public List<CatalogTitle> Titles { get; set; } = [];
     }
 }
 

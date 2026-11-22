@@ -3,769 +3,781 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
 using Windows.Foundation;
-using Windows.Foundation.Collections;
-using Windows.Media.Core;
 using Windows.Media.Playback;
-using Windows.Storage;
-using Windows.Storage.Pickers;
-using Windows.System;
-using WinRT.Interop;
 
 namespace VibeFlix.Windows;
 
 public sealed partial class MainWindow
 {
-    private async void ShowTitleDetails(CatalogTitle title, ProgressEntry? resumeProgress = null)
+    private async void ShowTitleDetails(
+        CatalogTitle title,
+        ProgressEntry? resumeProgress = null,
+        bool startPlayback = false)
     {
-        var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        var activeTitle = title;
+        var detailCancellation = new CancellationTokenSource();
+        var dispatcher = DispatcherQueue.GetForCurrentThread();
         var dialog = new ContentDialog
         {
             Title = title.Name,
             CloseButtonText = "Close",
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = AppRoot.XamlRoot,
-            MaxWidth = 860
+            MaxWidth = 980
         };
         var scroll = new ScrollViewer
         {
-            MaxHeight = 620,
+            MaxHeight = 720,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
-        var body = new StackPanel { Spacing = 14, Margin = new Thickness(0, 4, 0, 4) };
+        var body = new StackPanel { Spacing = 16, Margin = new Thickness(0, 4, 0, 4) };
         var detailsPanel = new StackPanel { Spacing = 14 };
-        var playerPanel = new StackPanel { Spacing = 12, Visibility = Visibility.Collapsed };
-        var statusText = CreateText(string.Empty, 12, "#A8D8BD", TextWrapping.Wrap);
-        var playerFeedback = CreateText(string.Empty, 12, "#A8D8BD", TextWrapping.Wrap);
-        var episodeOptions = new List<(int SeasonIndex, int EpisodeIndex, MediaEpisode Episode)>();
-        for (var seasonIndex = 0; seasonIndex < title.Seasons.Count; seasonIndex++)
+        var playerPanel = new StackPanel { Spacing = 10, Visibility = Visibility.Collapsed };
+        var feedback = CreateText(string.Empty, 12, "#B8C2D0", TextWrapping.Wrap);
+        var detailStatus = CreateText("Loading details from the selected provider…", 12, "#B8C2D0", TextWrapping.Wrap);
+        var detailsFeedback = CreateText(string.Empty, 12, "#B8C2D0", TextWrapping.Wrap);
+        var playbackPositionText = CreateText("00:00 / 00:00", 11, "#AEB8C8");
+        var playbackProgress = new ProgressBar
         {
-            var season = title.Seasons[seasonIndex];
-            for (var episodeIndex = 0; episodeIndex < season.Episodes.Count; episodeIndex++)
-            {
-                episodeOptions.Add((seasonIndex, episodeIndex, season.Episodes[episodeIndex]));
-            }
-        }
-
-        var selectedEpisodeIndex = title.IsSeries && episodeOptions.Count > 0 ? 0 : -1;
-        var currentItem = (MediaPlaybackItem?)null;
-        var currentFile = (StorageFile?)null;
-        var pendingResumePosition = (TimeSpan?)null;
-        var selectedCaptionTrackKey = (string?)null;
-        TextBlock playerEpisodeText = null!;
-        TextBlock localFileText = null!;
-        Button chooseFileButton = null!;
-        Button playPauseButton = null!;
-        Slider timelineSlider = null!;
-        TextBlock timelineText = null!;
-        ComboBox captionPicker = null!;
-        TextBlock captionStatus = null!;
-        Button previousEpisodeButton = null!;
-        Button nextEpisodeButton = null!;
-        DispatcherTimer progressTimer = null!;
-        var isUpdatingCaptionPicker = false;
-        var isUpdatingTimeline = false;
-        var isUserSeeking = false;
-        var progressTicks = 0;
-        TypedEventHandler<MediaPlaybackItem, IVectorChangedEventArgs>? tracksChangedHandler = null;
+            Minimum = 0,
+            Maximum = 100,
+            Value = 0,
+            Height = 5,
+            Foreground = Brush("#E34855"),
+            Background = Brush("#343434")
+        };
+        var episodeRows = new StackPanel { Spacing = 7 };
+        var seasonPicker = new ComboBox
+        {
+            Width = 300,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Visibility = Visibility.Collapsed
+        };
+        AutomationProperties.SetName(seasonPicker, "Select a season");
+        Button? listButton = null;
+        var playButton = CreateActionButton("▶  Play", () => _ = StartSelectedPlaybackAsync());
+        playButton.IsEnabled = false;
+        var playbackStarted = false;
+        var activePlaybackPath = string.Empty;
+        var activeEpisodeKey = string.Empty;
+        var activeEpisode = (MediaEpisode?)null;
+        var activeSeasonIndex = -1;
+        var pendingEpisodeNavigation = 0;
+        var seasons = new List<MediaSeason>();
+        var selectedStreamIndex = 0;
+        ProviderPlaybackService.PlaybackResolution? resolution = null;
+        TimeSpan? resumePosition = resumeProgress is { IsPreviewMarker: false, PositionMilliseconds: > 0 }
+            ? TimeSpan.FromMilliseconds(resumeProgress.PositionMilliseconds)
+            : null;
+        var seasonRequestVersion = 0;
+        var playbackGeneration = 0;
+        var openedPlaybackGeneration = -1;
+        CancellationTokenSource? playbackCancellation = null;
         TypedEventHandler<MediaPlayer, object>? mediaOpenedHandler = null;
         TypedEventHandler<MediaPlayer, MediaPlayerFailedEventArgs>? mediaFailedHandler = null;
+        TypedEventHandler<MediaPlayer, object>? mediaEndedHandler = null;
 
-        var detailGrid = new Grid { ColumnSpacing = 16 };
-        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
-        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        detailGrid.Children.Add(CreatePoster(title, 224));
-
-        var description = new StackPanel { Spacing = 10 };
-        description.Children.Add(CreateText(
-            $"{title.Year}  ·  {title.Rating}  ·  {title.RuntimeLabel}",
-            12, "#B6C0CE", FontWeights.SemiBold, TextWrapping.Wrap));
-        description.Children.Add(CreateText(
-            $"{title.Source}  ·  {title.Language}  ·  {string.Join("  /  ", title.Genres)}",
-            11, "#929EB0", TextWrapping.Wrap));
-        description.Children.Add(CreateText(title.Synopsis, 13, "#D4D9E2", TextWrapping.Wrap));
-        description.Children.Add(CreateText(
-            "Fictional catalogue metadata only. Choose a local video file you are authorized to play; no provider stream is requested, and the file path is not saved.",
-            10, "#8D99AA", TextWrapping.Wrap));
-
+        var detailHeader = new Grid { ColumnSpacing = 18 };
+        detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
+        detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailHeader.Children.Add(CreatePoster(title, 214));
+        var copy = new StackPanel { Spacing = 9 };
+        var metadata = new[]
+        {
+            title.Year > 0 ? title.Year.ToString() : string.Empty,
+            title.Rating,
+            title.RuntimeLabel,
+            title.Source
+        }.Where(part => !string.IsNullOrWhiteSpace(part));
+        copy.Children.Add(CreateText(string.Join("  ·  ", metadata), 12, "#B6C0CE", FontWeights.SemiBold, TextWrapping.Wrap));
+        var synopsis = CreateText(
+            string.IsNullOrWhiteSpace(title.Synopsis) ? "Provider details are loading." : title.Synopsis,
+            13,
+            "#D4D9E2",
+            TextWrapping.Wrap);
+        copy.Children.Add(synopsis);
+        copy.Children.Add(detailsFeedback);
         var actions = new StackPanel { Spacing = 8, Margin = new Thickness(0, 2, 0, 0) };
-        Button? listButton = null;
         listButton = CreateActionButton(
             _library.IsSaved(title.Id) ? "Remove from My List" : "Add to My List",
-            () => ToggleSavedFromDetails(title, listButton, statusText));
+            () => ToggleSavedFromDetails(activeTitle, listButton, detailsFeedback));
+        actions.Children.Add(playButton);
         actions.Children.Add(listButton);
-        actions.Children.Add(CreateActionButton("Mark watched manually", () => MarkWatchedFromDetails(title, statusText)));
-        actions.Children.Add(CreateActionButton("Play a local video", () => OpenPlayer(null), isPrimary: true));
-        description.Children.Add(actions);
-        description.Children.Add(statusText);
-        Grid.SetColumn(description, 1);
-        detailGrid.Children.Add(description);
-        detailsPanel.Children.Add(detailGrid);
+        actions.Children.Add(CreateActionButton("Mark watched manually", () => MarkWatchedFromDetails(activeTitle, detailsFeedback)));
+        copy.Children.Add(actions);
+        Grid.SetColumn(copy, 1);
+        detailHeader.Children.Add(copy);
+        detailsPanel.Children.Add(detailHeader);
+        detailsPanel.Children.Add(detailStatus);
 
-        if (title.IsSeries && title.Seasons.Count > 0)
-        {
-            detailsPanel.Children.Add(CreateText("Episodes", 18, "#F0F2F7", FontWeights.SemiBold));
-            var seasonPicker = new ComboBox
-            {
-                Width = 260,
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-            AutomationProperties.SetName(seasonPicker, "Select a season");
-            for (var seasonIndex = 0; seasonIndex < title.Seasons.Count; seasonIndex++)
-            {
-                var season = title.Seasons[seasonIndex];
-                seasonPicker.Items.Add(new ComboBoxItem { Content = season.Label, Tag = seasonIndex });
-            }
+        var seasonPanel = new StackPanel { Spacing = 8, Visibility = Visibility.Collapsed };
+        seasonPanel.Children.Add(CreateText("Episodes", 18, "#F0F2F7", FontWeights.SemiBold));
+        seasonPanel.Children.Add(seasonPicker);
+        seasonPanel.Children.Add(episodeRows);
+        detailsPanel.Children.Add(seasonPanel);
 
-            var episodeList = new StackPanel { Spacing = 7 };
-            void DrawEpisodes(int seasonIndex)
-            {
-                episodeList.Children.Clear();
-                var season = title.Seasons[seasonIndex];
-                for (var episodeIndex = 0; episodeIndex < season.Episodes.Count; episodeIndex++)
-                {
-                    var option = episodeOptions.FindIndex(item =>
-                        item.SeasonIndex == seasonIndex && item.EpisodeIndex == episodeIndex);
-                    var episode = season.Episodes[episodeIndex];
-                    var episodeButton = CreateActionButton(
-                        $"{episode.Number:00}  ·  {episode.Name}  ·  {episode.RuntimeMinutes} min",
-                        () => OpenPlayer(option));
-                    episodeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
-                    episodeButton.HorizontalContentAlignment = HorizontalAlignment.Left;
-                    AutomationProperties.SetHelpText(episodeButton, episode.Synopsis);
-                    ToolTipService.SetToolTip(episodeButton, episode.Synopsis);
-                    episodeList.Children.Add(episodeButton);
-                }
-            }
-
-            seasonPicker.SelectionChanged += (_, _) =>
-            {
-                if (seasonPicker.SelectedItem is ComboBoxItem { Tag: int seasonIndex })
-                {
-                    DrawEpisodes(seasonIndex);
-                }
-            };
-            seasonPicker.SelectedIndex = 0;
-            detailsPanel.Children.Add(seasonPicker);
-            detailsPanel.Children.Add(episodeList);
-        }
-
-        playerEpisodeText = CreateText(title.Name, 18, "#E9ECF2", FontWeights.SemiBold, TextWrapping.Wrap);
-        localFileText = CreateText(
-            "No local video selected. The demo catalogue does not contain playable media.",
-            11, "#A2ADBE", TextWrapping.Wrap);
         var mediaPlayerElement = new MediaPlayerElement
         {
-            Height = 330,
-            MinHeight = 230,
+            Height = 430,
+            MinHeight = 260,
             AutoPlay = false,
-            AreTransportControlsEnabled = false,
+            AreTransportControlsEnabled = true,
             RequestedTheme = ElementTheme.Dark
         };
         mediaPlayerElement.SetMediaPlayer(_playback.Player);
-        var playerSurface = new Border
+        playerPanel.Children.Add(new Border
         {
-            MinHeight = 230,
-            CornerRadius = new CornerRadius(14),
-            BorderBrush = Brush("#394456"),
+            MinHeight = 260,
+            CornerRadius = new CornerRadius(8),
+            BorderBrush = Brush("#333333"),
             BorderThickness = new Thickness(1),
-            Background = Brush("#05070A"),
+            Background = Brush("#050505"),
             Child = mediaPlayerElement
-        };
-        playerPanel.Children.Add(playerSurface);
-        playerPanel.Children.Add(playerEpisodeText);
-        playerPanel.Children.Add(localFileText);
-
-        var playbackActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        chooseFileButton = CreateActionButton("Choose local video", () =>
-        {
-            _ = OpenPlayerAsync(selectedEpisodeIndex, resumeProgress: null, forcePicker: true);
         });
-        playPauseButton = CreateActionButton("Play", TogglePlayback, isPrimary: true);
-        playPauseButton.IsEnabled = false;
-        playbackActions.Children.Add(chooseFileButton);
-        playbackActions.Children.Add(playPauseButton);
-        playerPanel.Children.Add(playbackActions);
+        var playerTitle = CreateText(title.Name, 18, "#E9ECF2", FontWeights.SemiBold, TextWrapping.Wrap);
+        playerPanel.Children.Add(playerTitle);
+        playerPanel.Children.Add(feedback);
+        playerPanel.Children.Add(playbackProgress);
+        playerPanel.Children.Add(playbackPositionText);
+        var playerActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var previousEpisodeButton = CreateActionButton("← Previous episode", () => _ = NavigateEpisodeAsync(-1));
+        var nextEpisodeButton = CreateActionButton("Next episode →", () => _ = NavigateEpisodeAsync(1));
+        previousEpisodeButton.Visibility = title.IsSeries ? Visibility.Visible : Visibility.Collapsed;
+        nextEpisodeButton.Visibility = title.IsSeries ? Visibility.Visible : Visibility.Collapsed;
+        previousEpisodeButton.IsEnabled = false;
+        nextEpisodeButton.IsEnabled = false;
+        var tryNextStreamButton = CreateActionButton("Try another stream", () => _ = StartNextStreamAsync());
+        tryNextStreamButton.Visibility = Visibility.Collapsed;
+        playerActions.Children.Add(previousEpisodeButton);
+        playerActions.Children.Add(nextEpisodeButton);
+        playerActions.Children.Add(tryNextStreamButton);
+        playerActions.Children.Add(CreateActionButton("Back to details", () => ReturnToDetails()));
+        playerPanel.Children.Add(playerActions);
 
-        timelineSlider = new Slider
-        {
-            Minimum = 0,
-            Maximum = 1000,
-            Value = 0,
-            StepFrequency = 1,
-            IsEnabled = false,
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
-        AutomationProperties.SetName(timelineSlider, "Playback position");
-        timelineText = CreateText("00:00 / 00:00", 11, "#AEB8C8");
-        timelineSlider.ValueChanged += (_, _) =>
-        {
-            if (isUserSeeking && !isUpdatingTimeline)
-            {
-                timelineText.Text = FormatTimelinePreview(timelineSlider.Value);
-            }
-        };
-        timelineSlider.PointerPressed += (_, _) => isUserSeeking = true;
-        timelineSlider.PointerReleased += (_, _) => CommitTimelineSeek();
-        timelineSlider.PointerCaptureLost += (_, _) => CommitTimelineSeek();
-        timelineSlider.KeyDown += (_, args) =>
-        {
-            if (args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Home or VirtualKey.End)
-            {
-                isUserSeeking = true;
-            }
-        };
-        timelineSlider.KeyUp += (_, args) =>
-        {
-            if (args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Home or VirtualKey.End)
-            {
-                CommitTimelineSeek();
-            }
-        };
-        playerPanel.Children.Add(timelineSlider);
-        playerPanel.Children.Add(timelineText);
+        body.Children.Add(detailsPanel);
+        body.Children.Add(playerPanel);
+        scroll.Content = body;
+        dialog.Content = scroll;
 
-        var captionControls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        captionControls.Children.Add(CreateText("Captions", 12, "#D4D9E2", FontWeights.SemiBold));
-        captionPicker = new ComboBox
-        {
-            Width = 280,
-            IsEnabled = false,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
-        AutomationProperties.SetName(captionPicker, "Select a timed-text caption track");
-        captionPicker.Items.Add(new ComboBoxItem { Content = "Off", Tag = string.Empty });
-        captionPicker.SelectedIndex = 0;
-        captionStatus = CreateText(
-            "Captions are off by default. Only timed-text tracks supplied by the selected media file are listed.",
-            10, "#909CAD", TextWrapping.Wrap);
-        captionPicker.SelectionChanged += (_, _) =>
-        {
-            if (isUpdatingCaptionPicker)
-            {
-                return;
-            }
+        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        progressTimer.Tick += (_, _) => SavePlaybackCheckpoint();
 
-            var selectedKey = (captionPicker.SelectedItem as ComboBoxItem)?.Tag as string;
-            selectedCaptionTrackKey = string.IsNullOrEmpty(selectedKey) ? null : selectedKey;
-            if (currentItem is not null)
-            {
-                ApplyCaptionPresentationModes(currentItem);
-            }
-
-            captionStatus.Text = selectedCaptionTrackKey is null
-                ? "Captions are off."
-                : "Showing the selected timed-text track.";
-        };
-        captionControls.Children.Add(captionPicker);
-        playerPanel.Children.Add(captionControls);
-        playerPanel.Children.Add(captionStatus);
-
-        var episodeNavigation = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        previousEpisodeButton = CreateActionButton("← Previous episode", () =>
+        void SetFeedback(string message, bool isError = false)
         {
-            _ = NavigateEpisode(-1);
-        });
-        nextEpisodeButton = CreateActionButton("Next episode →", () =>
-        {
-            _ = NavigateEpisode(1);
-        });
-        episodeNavigation.Children.Add(previousEpisodeButton);
-        episodeNavigation.Children.Add(nextEpisodeButton);
-        playerPanel.Children.Add(episodeNavigation);
-
-        playerPanel.Children.Add(playerFeedback);
-        playerPanel.Children.Add(CreateActionButton("Back to title details", () =>
-        {
-            StopCurrentPlayback(saveProgress: true);
-            playerPanel.Visibility = Visibility.Collapsed;
-            detailsPanel.Visibility = Visibility.Visible;
-            dialog.Title = title.Name;
-        }));
-
-        progressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        progressTimer.Tick += (_, _) =>
-        {
-            if (currentItem is null)
-            {
-                return;
-            }
-
-            UpdatePlaybackUi();
-            progressTicks++;
-            if (progressTicks >= 5)
-            {
-                progressTicks = 0;
-                SavePlaybackProgress();
-            }
-        };
-
-        void OpenPlayer(int? episodeIndex)
-        {
-            _ = OpenPlayerAsync(episodeIndex, resumeProgress: null);
+            feedback.Text = message;
+            feedback.Foreground = Brush(isError ? "#F0A69B" : "#A8D8BD");
         }
 
-        async Task OpenPlayerAsync(int? episodeIndex, ProgressEntry? resumeProgress, bool forcePicker = false)
+        void SetDetailsStatus(string message, bool isError = false)
         {
-            if (currentItem is not null)
-            {
-                SavePlaybackProgress();
-            }
-
-            if (episodeIndex is int index && index >= 0 && index < episodeOptions.Count)
-            {
-                selectedEpisodeIndex = index;
-            }
-            else if (title.IsSeries && selectedEpisodeIndex < 0 && episodeOptions.Count > 0)
-            {
-                selectedEpisodeIndex = 0;
-            }
-            else if (!title.IsSeries)
-            {
-                selectedEpisodeIndex = -1;
-            }
-
-            UpdateEpisodeHeader();
-            playerFeedback.Text = string.Empty;
-            playerPanel.Visibility = Visibility.Visible;
-            detailsPanel.Visibility = Visibility.Collapsed;
-            dialog.Title = selectedEpisodeIndex >= 0
-                ? $"Local playback  ·  {EpisodeLabel(selectedEpisodeIndex)}"
-                : $"Local playback  ·  {title.Name}";
-
-            var episodeKey = CurrentEpisodeKey();
-            var canUseResumeOverride = resumeProgress is not null
-                && (resumeProgress.IsPreviewMarker
-                    || string.Equals(resumeProgress.EpisodeKey, episodeKey, StringComparison.Ordinal));
-            var savedProgress = canUseResumeOverride
-                ? resumeProgress
-                : _library.GetProgress(title.Id, episodeKey);
-            var resumePosition = savedProgress is { IsPreviewMarker: false, PositionMilliseconds: > 0 }
-                ? TimeSpan.FromMilliseconds(savedProgress.PositionMilliseconds)
-                : (TimeSpan?)null;
-
-            StopCurrentPlayback(saveProgress: false);
-            var cacheKey = PlaybackCacheKey(title.Id, episodeKey);
-            StorageFile? file = null;
-            if (!forcePicker && _sessionMediaFiles.TryGetValue(cacheKey, out var rememberedFile))
-            {
-                file = rememberedFile;
-            }
-            else
-            {
-                file = await PickLocalVideoAsync();
-            }
-
-            if (file is null)
-            {
-                localFileText.Text = "No local video is loaded. Choose a file you are authorized to play; nothing was uploaded.";
-                playerFeedback.Text = "No file selected. Playback was not started.";
-                UpdatePlaybackUi();
-                return;
-            }
-
-            _sessionMediaFiles[cacheKey] = file;
-            currentFile = file;
-            pendingResumePosition = resumePosition;
-            localFileText.Text = $"Local file: {file.Name}  ·  file path is not saved";
-
-            try
-            {
-                currentItem = _playback.CreateLocalPlaybackItem(file);
-                AttachPlaybackHandlers(currentItem, file);
-                RefreshCaptionOptions(currentItem);
-                _playback.Load(currentItem);
-                _playback.Play();
-                playerFeedback.Foreground = Brush("#A8D8BD");
-                playerFeedback.Text = resumePosition is null
-                    ? "Playing a user-selected local file."
-                    : $"Resuming near {FormatPlaybackTime(resumePosition.Value)}.";
-                UpdatePlaybackUi();
-            }
-            catch (Exception)
-            {
-                StopCurrentPlayback(saveProgress: false);
-                playerFeedback.Foreground = Brush("#F0A69B");
-                playerFeedback.Text = "Windows could not open this file. Try another supported local video.";
-            }
+            detailStatus.Text = message;
+            detailStatus.Foreground = Brush(isError ? "#F0A69B" : "#A8D8BD");
         }
 
-        async Task NavigateEpisode(int offset)
+        void UpdateEpisodeNavigationButtons()
         {
-            var nextIndex = selectedEpisodeIndex + offset;
-            if (nextIndex >= 0 && nextIndex < episodeOptions.Count)
+            if (activeEpisode is null || activeSeasonIndex < 0 || activeSeasonIndex >= seasons.Count)
             {
-                await OpenPlayerAsync(nextIndex, resumeProgress: null);
-            }
-        }
-
-        async Task<StorageFile?> PickLocalVideoAsync()
-        {
-            try
-            {
-                var picker = new FileOpenPicker
-                {
-                    ViewMode = PickerViewMode.Thumbnail,
-                    SuggestedStartLocation = PickerLocationId.VideosLibrary
-                };
-                foreach (var extension in new[] { ".mp4", ".mkv", ".m4v", ".mov", ".wmv", ".avi", ".webm", ".mpeg", ".mpg", ".ts", ".m2ts", ".3gp" })
-                {
-                    picker.FileTypeFilter.Add(extension);
-                }
-
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-                return await picker.PickSingleFileAsync();
-            }
-            catch (Exception)
-            {
-                playerFeedback.Foreground = Brush("#F0A69B");
-                playerFeedback.Text = "The Windows file picker could not be opened. Playback was not started.";
-                return null;
-            }
-        }
-
-        void AttachPlaybackHandlers(MediaPlaybackItem item, StorageFile file)
-        {
-            tracksChangedHandler = (_, _) =>
-            {
-                dispatcherQueue.TryEnqueue(() =>
-                {
-                    if (ReferenceEquals(currentItem, item))
-                    {
-                        RefreshCaptionOptions(item);
-                    }
-                });
-            };
-            item.TimedMetadataTracksChanged += tracksChangedHandler;
-
-            mediaOpenedHandler = (_, _) =>
-            {
-                dispatcherQueue.TryEnqueue(() =>
-                {
-                    if (!ReferenceEquals(currentItem, item))
-                    {
-                        return;
-                    }
-
-                    if (pendingResumePosition is TimeSpan requestedPosition)
-                    {
-                        pendingResumePosition = null;
-                        var session = _playback.Player.PlaybackSession;
-                        if (session.CanSeek && session.NaturalDuration > TimeSpan.Zero)
-                        {
-                            var latestSeekPosition = session.NaturalDuration - TimeSpan.FromMilliseconds(250);
-                            if (latestSeekPosition < TimeSpan.Zero)
-                            {
-                                latestSeekPosition = TimeSpan.Zero;
-                            }
-
-                            var actualPosition = requestedPosition > latestSeekPosition
-                                ? latestSeekPosition
-                                : requestedPosition;
-                            _playback.Pause();
-                            _playback.SeekTo(actualPosition);
-                            _playback.Play();
-                        }
-                        else
-                        {
-                            playerFeedback.Text = "This file cannot seek; playback started at the beginning.";
-                        }
-                    }
-
-                    progressTimer.Start();
-                    UpdatePlaybackUi();
-                });
-            };
-            _playback.Player.MediaOpened += mediaOpenedHandler;
-
-            mediaFailedHandler = (_, _) =>
-            {
-                dispatcherQueue.TryEnqueue(() =>
-                {
-                    if (!ReferenceEquals(currentItem, item))
-                    {
-                        return;
-                    }
-
-                    progressTimer.Stop();
-                    playerFeedback.Foreground = Brush("#F0A69B");
-                    playerFeedback.Text = $"Windows could not decode {file.Name}. Try another supported local video or a Windows-supported codec.";
-                    UpdatePlaybackUi();
-                });
-            };
-            _playback.Player.MediaFailed += mediaFailedHandler;
-        }
-
-        void RefreshCaptionOptions(MediaPlaybackItem item)
-        {
-            var previousSelection = selectedCaptionTrackKey;
-            var options = new List<(string Key, string Label)>();
-            var tracks = item.TimedMetadataTracks;
-            for (uint index = 0; index < tracks.Count; index++)
-            {
-                var track = tracks[(int)index];
-                if (!IsCaptionTrack(track))
-                {
-                    continue;
-                }
-
-                var key = CaptionTrackKey(track, index);
-                var label = string.IsNullOrWhiteSpace(track.Label) ? string.Empty : track.Label.Trim();
-                var language = string.IsNullOrWhiteSpace(track.Language) ? string.Empty : track.Language.Trim();
-                if (label.Length == 0)
-                {
-                    label = language;
-                }
-                else if (language.Length > 0 && !string.Equals(label, language, StringComparison.OrdinalIgnoreCase))
-                {
-                    label = $"{label} ({language})";
-                }
-
-                if (label.Length == 0)
-                {
-                    label = $"Timed text {index + 1}";
-                }
-
-                options.Add((key, label));
-            }
-
-            isUpdatingCaptionPicker = true;
-            captionPicker.Items.Clear();
-            captionPicker.Items.Add(new ComboBoxItem { Content = "Off", Tag = string.Empty });
-            foreach (var option in options)
-            {
-                captionPicker.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.Key });
-            }
-
-            var selectedOptionIndex = options.FindIndex(option =>
-                string.Equals(option.Key, previousSelection, StringComparison.Ordinal));
-            selectedCaptionTrackKey = selectedOptionIndex >= 0 ? previousSelection : null;
-            captionPicker.SelectedIndex = selectedOptionIndex >= 0 ? selectedOptionIndex + 1 : 0;
-            captionPicker.IsEnabled = options.Count > 0;
-            isUpdatingCaptionPicker = false;
-
-            ApplyCaptionPresentationModes(item);
-            captionStatus.Text = options.Count == 0
-                ? "Captions are off. No caption or subtitle timed-text tracks were found in this file."
-                : "Captions are off by default. Select an actual timed-text track to show it.";
-        }
-
-        void ApplyCaptionPresentationModes(MediaPlaybackItem item)
-        {
-            var tracks = item.TimedMetadataTracks;
-            for (uint index = 0; index < tracks.Count; index++)
-            {
-                var track = tracks[(int)index];
-                if (!IsCaptionTrack(track))
-                {
-                    continue;
-                }
-
-                var selected = string.Equals(
-                    CaptionTrackKey(track, index),
-                    selectedCaptionTrackKey,
-                    StringComparison.Ordinal);
-                tracks.SetPresentationMode(
-                    index,
-                    selected
-                        ? TimedMetadataTrackPresentationMode.PlatformPresented
-                        : TimedMetadataTrackPresentationMode.Disabled);
-            }
-        }
-
-        void UpdateEpisodeHeader()
-        {
-            if (selectedEpisodeIndex >= 0 && selectedEpisodeIndex < episodeOptions.Count)
-            {
-                playerEpisodeText.Text = $"{title.Name}  ·  {EpisodeLabel(selectedEpisodeIndex)}\n{episodeOptions[selectedEpisodeIndex].Episode.Name}";
-                previousEpisodeButton.IsEnabled = selectedEpisodeIndex > 0;
-                nextEpisodeButton.IsEnabled = selectedEpisodeIndex < episodeOptions.Count - 1;
-            }
-            else
-            {
-                playerEpisodeText.Text = title.Name;
                 previousEpisodeButton.IsEnabled = false;
                 nextEpisodeButton.IsEnabled = false;
-            }
-
-            chooseFileButton.Content = currentFile is null ? "Choose local video" : "Change local video";
-        }
-
-        void UpdatePlaybackUi()
-        {
-            var loaded = currentItem is not null;
-            playPauseButton.IsEnabled = loaded;
-            chooseFileButton.Content = currentFile is null ? "Choose local video" : "Change local video";
-            var session = _playback.Player.PlaybackSession;
-            playPauseButton.Content = session.PlaybackState == MediaPlaybackState.Playing ? "Pause" : "Play";
-            timelineSlider.IsEnabled = loaded && session.CanSeek && session.NaturalDuration > TimeSpan.Zero;
-
-            if (session.NaturalDuration <= TimeSpan.Zero)
-            {
-                if (!isUserSeeking)
-                {
-                    timelineText.Text = "00:00 / 00:00";
-                }
-
                 return;
             }
 
-            if (!isUserSeeking)
-            {
-                isUpdatingTimeline = true;
-                timelineSlider.Value = Math.Clamp(
-                    session.Position.TotalMilliseconds * 1000d / session.NaturalDuration.TotalMilliseconds,
-                    0d,
-                    1000d);
-                timelineText.Text = $"{FormatPlaybackTime(session.Position)} / {FormatPlaybackTime(session.NaturalDuration)}";
-                isUpdatingTimeline = false;
-            }
+            var episodes = seasons[activeSeasonIndex].Episodes;
+            var episodeIndex = episodes.ToList().FindIndex(episode => episode.Number == activeEpisode.Number);
+            previousEpisodeButton.IsEnabled = episodeIndex > 0 || activeSeasonIndex > 0;
+            nextEpisodeButton.IsEnabled = episodeIndex >= 0
+                && (episodeIndex < episodes.Count - 1 || activeSeasonIndex < seasons.Count - 1);
         }
 
-        string FormatTimelinePreview(double value)
+        void SetSelectedEpisode(MediaSeason season, MediaEpisode episode, int seasonIndex)
         {
-            var duration = _playback.Player.PlaybackSession.NaturalDuration;
-            if (duration <= TimeSpan.Zero)
-            {
-                return "00:00 / 00:00";
-            }
-
-            var fraction = Math.Clamp(value / timelineSlider.Maximum, 0d, 1d);
-            var preview = TimeSpan.FromTicks((long)(duration.Ticks * fraction));
-            return $"{FormatPlaybackTime(preview)} / {FormatPlaybackTime(duration)}";
+            activeSeasonIndex = seasonIndex;
+            activeEpisode = episode;
+            activeEpisodeKey = MakeEpisodeKey(season, episode);
+            playButton.Content = "▶  Play selected episode";
+            playButton.IsEnabled = true;
+            detailsFeedback.Text = $"Selected  ·  S{season.Number:00} E{episode.Number:00}  ·  {episode.Name}";
+            detailsFeedback.Foreground = Brush("#AEB8C8");
+            SetDetailsStatus(string.Empty);
+            UpdateEpisodeNavigationButtons();
         }
 
-        void CommitTimelineSeek()
+        void DrawEpisodeRows(MediaSeason season, int seasonIndex)
         {
-            if (!isUserSeeking)
+            episodeRows.Children.Clear();
+            if (season.Episodes.Count == 0)
+            {
+                episodeRows.Children.Add(CreateCompactEmptyState("No episodes returned.", "Try selecting this season again later."));
+                activeEpisode = null;
+                activeEpisodeKey = string.Empty;
+                pendingEpisodeNavigation = 0;
+                playButton.IsEnabled = false;
+                UpdateEpisodeNavigationButtons();
+                return;
+            }
+
+            foreach (var episode in season.Episodes)
+            {
+                var episodeButton = CreateActionButton(
+                    $"▶  {episode.Number:00}  ·  {episode.Name}{(episode.RuntimeMinutes > 0 ? $"  ·  {episode.RuntimeMinutes} min" : string.Empty)}",
+                    () =>
+                    {
+                        SetSelectedEpisode(season, episode, seasonIndex);
+                        _ = StartSelectedPlaybackAsync();
+                    });
+                episodeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+                episodeButton.HorizontalContentAlignment = HorizontalAlignment.Left;
+                AutomationProperties.SetHelpText(episodeButton, episode.Synopsis);
+                ToolTipService.SetToolTip(episodeButton, episode.Synopsis);
+                episodeRows.Children.Add(episodeButton);
+            }
+
+            var preferredEpisode = resumeProgress is not null
+                ? season.Episodes.FirstOrDefault(episode =>
+                    string.Equals(MakeEpisodeKey(season, episode), resumeProgress.EpisodeKey, StringComparison.Ordinal))
+                : null;
+            SetSelectedEpisode(season, preferredEpisode ?? season.Episodes[0], seasonIndex);
+        }
+
+        async Task LoadSeasonEpisodesAsync(int seasonIndex)
+        {
+            if (seasonIndex < 0 || seasonIndex >= seasons.Count || detailCancellation.IsCancellationRequested)
             {
                 return;
             }
 
-            isUserSeeking = false;
-            var session = _playback.Player.PlaybackSession;
-            if (currentItem is null || !session.CanSeek || session.NaturalDuration <= TimeSpan.Zero)
-            {
-                UpdatePlaybackUi();
-                return;
-            }
-
-            var fraction = Math.Clamp(timelineSlider.Value / timelineSlider.Maximum, 0d, 1d);
-            var target = TimeSpan.FromTicks((long)(session.NaturalDuration.Ticks * fraction));
+            activeSeasonIndex = seasonIndex;
+            activeEpisode = null;
+            activeEpisodeKey = string.Empty;
+            playButton.IsEnabled = false;
+            var request = ++seasonRequestVersion;
+            episodeRows.Children.Clear();
+            episodeRows.Children.Add(CreateCompactEmptyState("Loading episodes…", "Fetching this season from the selected provider."));
             try
             {
-                _playback.SeekTo(target);
-                SavePlaybackProgress();
-            }
-            catch (ArgumentOutOfRangeException)
-            {
-                playerFeedback.Foreground = Brush("#F0A69B");
-                playerFeedback.Text = "Windows rejected that seek position. Try a point within the video duration.";
-            }
+                var loadedEpisodes = await _catalogSources.LoadSeasonEpisodesAsync(
+                    activeTitle,
+                    seasons[seasonIndex],
+                    detailCancellation.Token);
+                if (request != seasonRequestVersion || detailCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
 
-            UpdatePlaybackUi();
+                seasons[seasonIndex] = seasons[seasonIndex] with { Episodes = loadedEpisodes };
+                activeTitle = activeTitle with { Seasons = seasons.ToArray() };
+                _titleCache[activeTitle.Id] = activeTitle;
+                if (_library.IsKnownTitle(activeTitle.Id))
+                {
+                    _library.UpsertTitle(activeTitle);
+                }
+
+                if (seasonPicker.Items[seasonIndex] is ComboBoxItem seasonItem)
+                {
+                    seasonItem.Content = FormatSeasonLabel(seasons[seasonIndex]);
+                }
+
+                DrawEpisodeRows(seasons[seasonIndex], seasonIndex);
+                if (pendingEpisodeNavigation != 0 && seasons[seasonIndex].Episodes.Count > 0)
+                {
+                    var direction = pendingEpisodeNavigation;
+                    pendingEpisodeNavigation = 0;
+                    var targetEpisode = direction > 0
+                        ? seasons[seasonIndex].Episodes[0]
+                        : seasons[seasonIndex].Episodes[^1];
+                    SetSelectedEpisode(seasons[seasonIndex], targetEpisode, seasonIndex);
+                    await StartSelectedPlaybackAsync();
+                }
+                else if (startPlayback && seasons[seasonIndex].Episodes.Count > 0)
+                {
+                    if (resumeProgress is { IsPreviewMarker: false }
+                        && !string.Equals(activeEpisodeKey, resumeProgress.EpisodeKey, StringComparison.Ordinal))
+                    {
+                        startPlayback = false;
+                        SetDetailsStatus("The saved episode is no longer available. Select an episode to continue.", isError: true);
+                    }
+                    else
+                    {
+                        startPlayback = false;
+                        await StartSelectedPlaybackAsync();
+                    }
+                }
+                else if (resumeProgress is not null && activeEpisode is not null
+                    && string.Equals(activeEpisodeKey, resumeProgress.EpisodeKey, StringComparison.Ordinal))
+                {
+                    detailsFeedback.Text = $"Resume  ·  {FormatPlaybackTime(resumePosition ?? TimeSpan.Zero)}";
+                }
+            }
+            catch (OperationCanceledException) when (detailCancellation.IsCancellationRequested)
+            {
+                // The dialog was closed or another season selection superseded this request.
+            }
+            catch (Exception)
+            {
+                if (request == seasonRequestVersion && !detailCancellation.IsCancellationRequested)
+                {
+                    episodeRows.Children.Clear();
+                    episodeRows.Children.Add(CreateCompactEmptyState(
+                        "Episodes are unavailable.",
+                        "The provider did not return this season. You can retry by selecting it again."));
+                    pendingEpisodeNavigation = 0;
+                    activeEpisode = null;
+                    activeEpisodeKey = string.Empty;
+                    playButton.IsEnabled = false;
+                    UpdateEpisodeNavigationButtons();
+                    SetDetailsStatus("Could not load episodes from the selected provider.", isError: true);
+                }
+            }
         }
 
-        void TogglePlayback()
+        async Task PopulateTitleDetailsAsync()
         {
-            if (currentItem is null)
+            try
+            {
+                var details = await _catalogSources.LoadDetailsAsync(activeTitle, detailCancellation.Token);
+                if (detailCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                activeTitle = activeTitle with
+                {
+                    Year = details.Year > 0 ? details.Year : activeTitle.Year,
+                    Rating = string.IsNullOrWhiteSpace(details.Rating) ? activeTitle.Rating : details.Rating,
+                    RuntimeMinutes = details.RuntimeMinutes > 0 ? details.RuntimeMinutes : activeTitle.RuntimeMinutes,
+                    Synopsis = string.IsNullOrWhiteSpace(details.Synopsis) ? activeTitle.Synopsis : details.Synopsis,
+                    Language = string.IsNullOrWhiteSpace(details.Language) ? activeTitle.Language : details.Language,
+                    Genres = details.Genres.Count == 0 ? activeTitle.Genres : details.Genres,
+                    Seasons = details.Seasons.Count == 0 ? activeTitle.Seasons : details.Seasons
+                };
+                _titleCache[activeTitle.Id] = activeTitle;
+                if (_library.IsKnownTitle(activeTitle.Id))
+                {
+                    _library.UpsertTitle(activeTitle);
+                }
+
+                synopsis.Text = activeTitle.Synopsis;
+                var updatedMetadata = new[]
+                {
+                    activeTitle.Year > 0 ? activeTitle.Year.ToString() : string.Empty,
+                    activeTitle.Rating,
+                    activeTitle.RuntimeLabel,
+                    activeTitle.Source,
+                    activeTitle.Language,
+                    string.Join("  /  ", activeTitle.Genres)
+                }.Where(part => !string.IsNullOrWhiteSpace(part));
+                detailsFeedback.Text = string.Join("  ·  ", updatedMetadata);
+                detailsFeedback.Foreground = Brush("#AEB8C8");
+                SetDetailsStatus(string.Empty);
+
+                if (activeTitle.IsSeries)
+                {
+                    seasons = activeTitle.Seasons.OrderBy(season => season.Number).ToList();
+                    seasonPanel.Visibility = Visibility.Visible;
+                    seasonPicker.Items.Clear();
+                    foreach (var season in seasons)
+                    {
+                        seasonPicker.Items.Add(new ComboBoxItem { Content = FormatSeasonLabel(season) });
+                    }
+
+                    if (seasons.Count == 0)
+                    {
+                        episodeRows.Children.Add(CreateCompactEmptyState("No seasons returned.", "The provider has not listed episodes for this series."));
+                        playButton.IsEnabled = false;
+                        if (startPlayback)
+                        {
+                            SetDetailsStatus("This series has no provider episode list to play.", isError: true);
+                        }
+
+                        return;
+                    }
+
+                    var resumeSeason = resumeProgress is null
+                        ? -1
+                        : seasons.FindIndex(season => season.Number == ParseEpisodeKey(resumeProgress.EpisodeKey).Season);
+                    var initialSeason = resumeSeason >= 0 ? resumeSeason : 0;
+                    seasonPicker.SelectedIndex = initialSeason;
+                    seasonPicker.SelectionChanged += async (_, _) =>
+                    {
+                        if (seasonPicker.SelectedIndex >= 0)
+                        {
+                            await LoadSeasonEpisodesAsync(seasonPicker.SelectedIndex);
+                        }
+                    };
+                    await LoadSeasonEpisodesAsync(initialSeason);
+                }
+                else
+                {
+                    playButton.IsEnabled = true;
+                    if (startPlayback)
+                    {
+                        await StartSelectedPlaybackAsync();
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (detailCancellation.IsCancellationRequested)
+            {
+                // Dialog closed before the provider returned details.
+            }
+            catch (Exception)
+            {
+                if (!detailCancellation.IsCancellationRequested)
+                {
+                    SetDetailsStatus("Provider details could not be loaded. You can still try Play.", isError: true);
+                    playButton.IsEnabled = !activeTitle.IsSeries;
+                }
+            }
+        }
+
+        async Task NavigateEpisodeAsync(int offset)
+        {
+            if (offset == 0 || activeSeasonIndex < 0 || activeSeasonIndex >= seasons.Count || activeEpisode is null)
             {
                 return;
             }
 
-            if (_playback.Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing)
+            var currentEpisodes = seasons[activeSeasonIndex].Episodes;
+            var currentIndex = currentEpisodes.ToList().FindIndex(episode => episode.Number == activeEpisode.Number);
+            var targetIndex = currentIndex + Math.Sign(offset);
+            if (currentIndex < 0)
             {
-                _playback.Pause();
-                SavePlaybackProgress();
-            }
-            else
-            {
-                _playback.Play();
+                return;
             }
 
-            UpdatePlaybackUi();
+            if (targetIndex >= 0 && targetIndex < currentEpisodes.Count)
+            {
+                SetSelectedEpisode(seasons[activeSeasonIndex], currentEpisodes[targetIndex], activeSeasonIndex);
+                await StartSelectedPlaybackAsync();
+                return;
+            }
+
+            var targetSeasonIndex = activeSeasonIndex + Math.Sign(offset);
+            if (targetSeasonIndex < 0 || targetSeasonIndex >= seasons.Count)
+            {
+                return;
+            }
+
+            pendingEpisodeNavigation = Math.Sign(offset);
+            seasonPicker.SelectedIndex = targetSeasonIndex;
         }
 
-        void SavePlaybackProgress()
+        async Task StartNextStreamAsync()
         {
-            if (currentItem is null)
+            var currentResolution = resolution;
+            if (currentResolution is null || selectedStreamIndex + 1 >= currentResolution.Streams.Count
+                || playbackCancellation is null || playbackCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            selectedStreamIndex++;
+            playbackGeneration++;
+            openedPlaybackGeneration = -1;
+            progressTimer.Stop();
+            playbackStarted = false;
+            _playback.ClearSource();
+            await LoadCurrentStreamAsync(playbackGeneration, playbackCancellation.Token);
+        }
+
+        async Task LoadCurrentStreamAsync(int generation, CancellationToken cancellationToken)
+        {
+            var currentResolution = resolution;
+            if (currentResolution is null || selectedStreamIndex >= currentResolution.Streams.Count
+                || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var stream = currentResolution.Streams[selectedStreamIndex];
+            SetFeedback($"Connecting to {stream.Server}…");
+            try
+            {
+                await _playback.LoadAsync(stream, cancellationToken);
+                if (generation != playbackGeneration || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                playbackStarted = true;
+                _playback.Play();
+                progressTimer.Start();
+                tryNextStreamButton.Visibility = selectedStreamIndex + 1 < currentResolution.Streams.Count
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                SetFeedback("Playback started. Stream addresses remain in memory only.");
+                if (openedPlaybackGeneration == generation)
+                {
+                    ApplyPendingResume(generation);
+                }
+                else
+                {
+                    UpdatePlaybackPosition();
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // A new playback request or a closed dialog superseded this stream.
+            }
+            catch (Exception)
+            {
+                if (generation != playbackGeneration || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                playbackStarted = false;
+                progressTimer.Stop();
+                if (selectedStreamIndex + 1 < currentResolution.Streams.Count)
+                {
+                    tryNextStreamButton.Visibility = Visibility.Visible;
+                    SetFeedback("This stream could not start. Try another available stream.", isError: true);
+                }
+                else
+                {
+                    tryNextStreamButton.Visibility = Visibility.Collapsed;
+                    SetFeedback("Windows could not start this provider stream. Try again later.", isError: true);
+                }
+            }
+        }
+
+        void ApplyPendingResume(int generation)
+        {
+            if (generation != playbackGeneration || !playbackStarted || resumePosition is not TimeSpan target)
+            {
+                UpdatePlaybackPosition();
+                return;
+            }
+
+            resumePosition = null;
+            var session = _playback.Player.PlaybackSession;
+            if (!session.CanSeek || session.NaturalDuration <= TimeSpan.Zero)
+            {
+                SetFeedback("This provider stream cannot seek to the saved position. Playback started from the beginning.");
+                UpdatePlaybackPosition();
+                return;
+            }
+
+            var safeTarget = session.NaturalDuration - TimeSpan.FromMilliseconds(250);
+            if (safeTarget < TimeSpan.Zero)
+            {
+                safeTarget = TimeSpan.Zero;
+            }
+
+            _playback.Pause();
+            _playback.SeekTo(target > safeTarget ? safeTarget : target);
+            _playback.Play();
+            UpdatePlaybackPosition();
+        }
+
+        void UpdatePlaybackPosition()
+        {
+            if (!playbackStarted)
             {
                 return;
             }
 
             var session = _playback.Player.PlaybackSession;
             var duration = session.NaturalDuration;
-            if (duration <= TimeSpan.Zero)
+            var position = session.Position;
+            playbackPositionText.Text = $"{FormatPlaybackTime(position)} / {FormatPlaybackTime(duration)}";
+            playbackProgress.Value = duration > TimeSpan.Zero
+                ? Math.Clamp(position.TotalMilliseconds * 100 / duration.TotalMilliseconds, 0, 100)
+                : 0;
+        }
+
+        void SavePlaybackCheckpoint(bool ended = false)
+        {
+            if (!playbackStarted || string.IsNullOrWhiteSpace(activePlaybackPath))
             {
                 return;
             }
 
-            var position = session.Position;
-            var completesTitle = !title.IsSeries
-                || (episodeOptions.Count > 0 && selectedEpisodeIndex == episodeOptions.Count - 1);
             try
             {
+                var session = _playback.Player.PlaybackSession;
+                var duration = session.NaturalDuration;
+                var position = session.Position;
+                if (ended && duration > TimeSpan.Zero)
+                {
+                    position = duration;
+                }
+
+                if (duration <= TimeSpan.Zero || (position < TimeSpan.FromSeconds(5) && !ended))
+                {
+                    UpdatePlaybackPosition();
+                    return;
+                }
+
+                var finalEpisode = !activeTitle.IsSeries;
+                if (activeTitle.IsSeries && activeSeasonIndex >= 0 && activeSeasonIndex < seasons.Count)
+                {
+                    var currentEpisodes = seasons[activeSeasonIndex].Episodes;
+                    finalEpisode = activeSeasonIndex == seasons.Count - 1
+                        && currentEpisodes.Count > 0
+                        && activeEpisode is not null
+                        && activeEpisode.Number >= currentEpisodes.Max(episode => episode.Number);
+                }
+
+                var completed = duration > TimeSpan.Zero
+                    && position.TotalMilliseconds / duration.TotalMilliseconds >= 0.95
+                    && finalEpisode;
                 _library.SavePlaybackProgress(
-                    title.Id,
-                    CurrentEpisodeKey(),
-                    (long)Math.Max(0, position.TotalMilliseconds),
-                    (long)duration.TotalMilliseconds,
-                    completesTitle);
+                    activeTitle.Id,
+                    activeEpisodeKey,
+                    Math.Max(0, (long)position.TotalMilliseconds),
+                    Math.Max(0, (long)duration.TotalMilliseconds),
+                    titleCompleted: completed);
+                if (!_windowClosed)
+                {
+                    RenderCurrentPage(resetScroll: false);
+                }
+
+                if (completed)
+                {
+                    playbackStarted = false;
+                    progressTimer.Stop();
+                    SetFeedback("Title completed and added to History.");
+                }
+                else
+                {
+                    UpdatePlaybackPosition();
+                }
             }
-            catch (IOException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                playerFeedback.Foreground = Brush("#F0A69B");
-                playerFeedback.Text = "Playback is continuing, but the local resume position could not be saved.";
-            }
-            catch (UnauthorizedAccessException)
-            {
-                playerFeedback.Foreground = Brush("#F0A69B");
-                playerFeedback.Text = "Playback is continuing, but the local resume position could not be saved.";
+                SetFeedback("Playback continues, but VibeFlix could not save this resume point.", isError: true);
             }
         }
 
-        void StopCurrentPlayback(bool saveProgress)
+        async Task StartSelectedPlaybackAsync()
         {
-            progressTimer.Stop();
-            if (currentItem is null)
+            if (detailCancellation.IsCancellationRequested || (activeTitle.IsSeries && activeEpisode is null))
             {
-                currentFile = null;
-                pendingResumePosition = null;
+                if (activeTitle.IsSeries)
+                {
+                    SetFeedback("Select an episode before starting playback.", isError: true);
+                }
+
                 return;
             }
 
-            if (saveProgress)
+            if (playbackStarted)
             {
-                SavePlaybackProgress();
+                SavePlaybackCheckpoint();
             }
 
-            _playback.Pause();
-            DetachPlaybackHandlers();
+            playbackCancellation?.Cancel();
+            playbackCancellation?.Dispose();
+            playbackCancellation = CancellationTokenSource.CreateLinkedTokenSource(detailCancellation.Token);
+            var requestToken = playbackCancellation.Token;
+            var generation = ++playbackGeneration;
+            openedPlaybackGeneration = -1;
+            progressTimer.Stop();
             _playback.ClearSource();
-            currentItem = null;
-            currentFile = null;
-            pendingResumePosition = null;
-            selectedCaptionTrackKey = null;
-            isUserSeeking = false;
-            captionPicker.Items.Clear();
-            captionPicker.Items.Add(new ComboBoxItem { Content = "Off", Tag = string.Empty });
-            captionPicker.SelectedIndex = 0;
-            captionPicker.IsEnabled = false;
-            captionStatus.Text = "Captions are off by default. Only timed-text tracks supplied by the selected media file are listed.";
-            UpdatePlaybackUi();
+            selectedStreamIndex = 0;
+            resolution = null;
+            activePlaybackPath = activeEpisode?.CatalogPath ?? activeTitle.CatalogPath;
+            if (string.IsNullOrWhiteSpace(activePlaybackPath))
+            {
+                SetDetailsStatus("This title has no provider playback page.", isError: true);
+                return;
+            }
+
+            activeEpisodeKey = activeTitle.IsSeries && activeSeasonIndex >= 0 && activeEpisode is not null
+                ? MakeEpisodeKey(seasons[activeSeasonIndex], activeEpisode)
+                : string.Empty;
+            var matchingResume = resumeProgress is not null
+                && (resumeProgress.IsPreviewMarker
+                    || string.Equals(resumeProgress.EpisodeKey, activeEpisodeKey, StringComparison.Ordinal));
+            var storedProgress = matchingResume
+                ? resumeProgress
+                : _library.GetProgress(activeTitle.Id, activeEpisodeKey);
+            resumePosition = storedProgress is { IsPreviewMarker: false, PositionMilliseconds: > 0 }
+                ? TimeSpan.FromMilliseconds(storedProgress.PositionMilliseconds)
+                : null;
+            resumeProgress = null;
+
+            detailsPanel.Visibility = Visibility.Collapsed;
+            playerPanel.Visibility = Visibility.Visible;
+            playerTitle.Text = activeEpisode is null
+                ? activeTitle.Name
+                : $"{activeTitle.Name}  ·  S{seasons[activeSeasonIndex].Number:00} E{activeEpisode.Number:00}  ·  {activeEpisode.Name}";
+            dialog.Title = $"Playing  ·  {activeTitle.Name}";
+            SetFeedback("Resolving a provider stream…");
+            playbackPositionText.Text = "00:00 / 00:00";
+            playbackProgress.Value = 0;
+            tryNextStreamButton.Visibility = Visibility.Collapsed;
+            playbackStarted = false;
+
+            try
+            {
+                _library.UpsertTitle(activeTitle);
+                _titleCache[activeTitle.Id] = activeTitle;
+                resolution = await _providerPlayback.ResolveAsync(
+                    activeTitle,
+                    activeEpisode?.CatalogPath,
+                    requestToken);
+                if (generation != playbackGeneration || requestToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(resolution.ResolvedCatalogPath)
+                    && activeTitle.IsSeries
+                    && activeEpisode is not null
+                    && !resolution.ResolvedCatalogPath.Equals(activeEpisode.CatalogPath, StringComparison.Ordinal))
+                {
+                    activePlaybackPath = resolution.ResolvedCatalogPath;
+                }
+
+                await LoadCurrentStreamAsync(generation, requestToken);
+            }
+            catch (OperationCanceledException) when (requestToken.IsCancellationRequested)
+            {
+                // A new playback request or a closed dialog superseded this resolution.
+            }
+            catch (ProviderPlaybackService.PlaybackResolutionException exception)
+            {
+                if (generation == playbackGeneration && !requestToken.IsCancellationRequested)
+                {
+                    SetFeedback(exception.Message, isError: true);
+                }
+            }
+            catch (Exception)
+            {
+                if (generation == playbackGeneration && !requestToken.IsCancellationRequested)
+                {
+                    SetFeedback("The selected provider could not prepare playback. Try again later.", isError: true);
+                }
+            }
         }
 
-        void DetachPlaybackHandlers()
+        void ReturnToDetails()
         {
-            if (currentItem is not null && tracksChangedHandler is not null)
+            if (playbackStarted)
             {
-                currentItem.TimedMetadataTracksChanged -= tracksChangedHandler;
+                SavePlaybackCheckpoint();
             }
 
+            playbackCancellation?.Cancel();
+            playbackGeneration++;
+            openedPlaybackGeneration = -1;
+            progressTimer.Stop();
+            _playback.ClearSource();
+            playbackStarted = false;
+            playerPanel.Visibility = Visibility.Collapsed;
+            detailsPanel.Visibility = Visibility.Visible;
+            dialog.Title = activeTitle.Name;
+            SetFeedback(string.Empty);
+        }
+
+        void DetachPlayerHandlers()
+        {
             if (mediaOpenedHandler is not null)
             {
                 _playback.Player.MediaOpened -= mediaOpenedHandler;
@@ -778,88 +790,143 @@ public sealed partial class MainWindow
                 mediaFailedHandler = null;
             }
 
-            tracksChangedHandler = null;
-        }
-
-        string CurrentEpisodeKey()
-        {
-            if (selectedEpisodeIndex < 0 || selectedEpisodeIndex >= episodeOptions.Count)
+            if (mediaEndedHandler is not null)
             {
-                return string.Empty;
-            }
-
-            var option = episodeOptions[selectedEpisodeIndex];
-            return MakeEpisodeKey(title.Seasons[option.SeasonIndex], option.Episode);
-        }
-
-        string EpisodeLabel(int index)
-        {
-            var option = episodeOptions[index];
-            var season = title.Seasons[option.SeasonIndex];
-            return $"S{season.Number:00} E{option.Episode.Number:00}";
-        }
-
-        void ApplyInitialResumeTarget()
-        {
-            if (resumeProgress is null || string.IsNullOrEmpty(resumeProgress.EpisodeKey))
-            {
-                return;
-            }
-
-            var match = episodeOptions.FindIndex(option =>
-                string.Equals(
-                    MakeEpisodeKey(title.Seasons[option.SeasonIndex], option.Episode),
-                    resumeProgress.EpisodeKey,
-                    StringComparison.Ordinal));
-            if (match >= 0)
-            {
-                selectedEpisodeIndex = match;
+                _playback.Player.MediaEnded -= mediaEndedHandler;
+                mediaEndedHandler = null;
             }
         }
 
-        ApplyInitialResumeTarget();
-        UpdateEpisodeHeader();
-        body.Children.Add(detailsPanel);
-        body.Children.Add(playerPanel);
-        scroll.Content = body;
-        dialog.Content = scroll;
+        void AttachPlayerHandlers()
+        {
+            DetachPlayerHandlers();
+            mediaOpenedHandler = (_, _) =>
+            {
+                var generation = playbackGeneration;
+                dispatcher.TryEnqueue(() =>
+                {
+                    if (generation != playbackGeneration || detailCancellation.IsCancellationRequested)
+                    {
+                        return;
+                    }
 
-        _flushPlaybackOnClose = () => StopCurrentPlayback(saveProgress: true);
+                    openedPlaybackGeneration = generation;
+                    ApplyPendingResume(generation);
+                });
+            };
+            mediaFailedHandler = (_, _) =>
+            {
+                var generation = playbackGeneration;
+                dispatcher.TryEnqueue(() =>
+                {
+                    if (generation != playbackGeneration || resolution is null
+                        || playerPanel.Visibility != Visibility.Visible)
+                    {
+                        return;
+                    }
+
+                    playbackStarted = false;
+                    progressTimer.Stop();
+                    tryNextStreamButton.Visibility = resolution is not null
+                        && selectedStreamIndex + 1 < resolution.Streams.Count
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                    SetFeedback("The provider stream stopped. Try another available stream or retry playback.", isError: true);
+                });
+            };
+            mediaEndedHandler = (_, _) =>
+            {
+                var generation = playbackGeneration;
+                dispatcher.TryEnqueue(() =>
+                {
+                    if (generation == playbackGeneration)
+                    {
+                        SavePlaybackCheckpoint(ended: true);
+                    }
+                });
+            };
+            _playback.Player.MediaOpened += mediaOpenedHandler;
+            _playback.Player.MediaFailed += mediaFailedHandler;
+            _playback.Player.MediaEnded += mediaEndedHandler;
+        }
+
+        async Task PopulateAndMaybePlayAsync()
+        {
+            await PopulateTitleDetailsAsync();
+        }
+
+        _flushPlaybackOnClose = () =>
+        {
+            detailCancellation.Cancel();
+            playbackCancellation?.Cancel();
+            progressTimer.Stop();
+            if (playbackStarted)
+            {
+                SavePlaybackCheckpoint();
+            }
+
+            playbackGeneration++;
+            _playback.ClearSource();
+        };
+
+        AttachPlayerHandlers();
         var dialogOperation = dialog.ShowAsync();
+        var detailsLoad = PopulateAndMaybePlayAsync();
         try
         {
-            if (resumeProgress is not null)
-            {
-                await OpenPlayerAsync(selectedEpisodeIndex >= 0 ? selectedEpisodeIndex : null, resumeProgress);
-            }
-
             await dialogOperation;
         }
         finally
         {
+            detailCancellation.Cancel();
+            playbackCancellation?.Cancel();
+            seasonRequestVersion++;
+            playbackGeneration++;
             progressTimer.Stop();
-            StopCurrentPlayback(saveProgress: true);
+            if (playbackStarted)
+            {
+                SavePlaybackCheckpoint();
+            }
+
+            DetachPlayerHandlers();
+            _playback.ClearSource();
+            playbackStarted = false;
             if (_flushPlaybackOnClose is not null)
             {
                 _flushPlaybackOnClose = null;
             }
 
+            try
+            {
+                await detailsLoad;
+            }
+            catch (OperationCanceledException)
+            {
+                // Closing the details dialog cancels unfinished provider work.
+            }
+
+            playbackCancellation?.Dispose();
+            playbackCancellation = null;
+            detailCancellation.Dispose();
             if (!_windowClosed)
             {
                 RenderCurrentPage(resetScroll: false);
             }
         }
+
     }
 
-    private void ResumeLocalPlayback(CatalogTitle title, ProgressEntry progress)
+    private void ResumePlayback(CatalogTitle title, ProgressEntry progress)
     {
-        ShowTitleDetails(title, progress);
+        ShowTitleDetails(title, progress, startPlayback: true);
     }
 
     private void ToggleSavedFromDetails(CatalogTitle title, Button? listButton, TextBlock feedback)
     {
         try
         {
+            _library.UpsertTitle(title);
+            _titleCache[title.Id] = title;
             _library.ToggleMyList(title.Id);
             if (listButton is not null)
             {
@@ -886,6 +953,8 @@ public sealed partial class MainWindow
     {
         try
         {
+            _library.UpsertTitle(title);
+            _titleCache[title.Id] = title;
             _library.MarkWatched(title.Id);
             feedback.Foreground = Brush("#A8D8BD");
             feedback.Text = "Marked manually in local History; this does not verify that the title was played.";
@@ -906,20 +975,29 @@ public sealed partial class MainWindow
     private static string MakeEpisodeKey(MediaSeason season, MediaEpisode episode) =>
         $"S{season.Number:00}E{episode.Number:00}";
 
-    private static string PlaybackCacheKey(string titleId, string episodeKey) =>
-        $"{titleId}\u001f{episodeKey}";
+    private static (int Season, int Episode) ParseEpisodeKey(string key)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(key, @"^S([0-9]{2,3})E([0-9]{2,5})$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        return match.Success && int.TryParse(match.Groups[1].Value, out var season)
+            && int.TryParse(match.Groups[2].Value, out var episode)
+                ? (season, episode)
+                : (0, 0);
+    }
 
-    private static bool IsCaptionTrack(TimedMetadataTrack track) =>
-        track.TimedMetadataKind is TimedMetadataKind.Caption
-            or TimedMetadataKind.Subtitle
-            or TimedMetadataKind.ImageSubtitle;
-
-    private static string CaptionTrackKey(TimedMetadataTrack track, uint index) =>
-        $"{track.Id}\u001f{index}";
+    private static string FormatSeasonLabel(MediaSeason season)
+    {
+        var name = string.IsNullOrWhiteSpace(season.Name) ? $"Season {season.Number}" : season.Name;
+        return season.Episodes.Count == 0 ? name : $"{name}  ·  {season.Episodes.Count} episodes";
+    }
 
     private static string FormatPlaybackTime(TimeSpan value)
     {
-        var hours = (long)Math.Max(0, value.TotalHours);
+        if (value < TimeSpan.Zero)
+        {
+            value = TimeSpan.Zero;
+        }
+
+        var hours = (long)value.TotalHours;
         return hours > 0
             ? $"{hours:00}:{value.Minutes:00}:{value.Seconds:00}"
             : $"{value.Minutes:00}:{value.Seconds:00}";
@@ -930,7 +1008,7 @@ public sealed partial class MainWindow
         var dialog = new ContentDialog
         {
             Title = "Clear local History?",
-            Content = "This removes local History entries. My List and episode resume positions will remain.",
+            Content = "This removes local History entries and the resume positions for those titles. My List is not changed.",
             PrimaryButtonText = "Clear History",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
@@ -961,9 +1039,9 @@ public sealed partial class MainWindow
     {
         var dialog = new ContentDialog
         {
-            Title = "Reset local library data?",
-            Content = "This clears My List, History, and local playback positions from this device. This action cannot be undone.",
-            PrimaryButtonText = "Reset local data",
+            Title = "Clear local library data?",
+            Content = "This clears My List, History, saved title metadata, and local playback positions from this device. This action cannot be undone.",
+            PrimaryButtonText = "Clear local data",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = AppRoot.XamlRoot
@@ -977,6 +1055,7 @@ public sealed partial class MainWindow
         try
         {
             _library.ClearLibrary();
+            _titleCache.Clear();
             RenderCurrentPage(resetScroll: true);
         }
         catch (IOException)
@@ -988,5 +1067,4 @@ public sealed partial class MainWindow
             ShowLocalWriteError();
         }
     }
-
 }

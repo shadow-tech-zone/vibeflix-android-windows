@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../VibeFlix.Windows/Models/CatalogTitle.cs" Link="Models/CatalogTitle.cs" />
     <Compile Include="../VibeFlix.Windows/Services/LocalLibraryStore.cs" Link="Services/LocalLibraryStore.cs" />
   </ItemGroup>
 </Project>

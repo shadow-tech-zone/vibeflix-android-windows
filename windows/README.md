@@ -1,39 +1,43 @@
 # Windows client
 
-VibeFlix Windows is a native WinUI 3 desktop app. It does not revive the removed WPF prototype and does not reuse Android's Media3 player. Its desktop browsing flow now uses a compact branded header, horizontal top navigation, a cinematic featured-title panel, and scrollable title shelves—streaming-app conventions adapted with VibeFlix styling, not a pixel-for-pixel Netflix copy. The catalogue and the original generated hero illustration are clearly identified as samples; no provider catalogue or playable media is bundled. The current playback slice opens user-selected local media through `Windows.Media.Playback`; no provider stream, credential, or media path is invented or persisted.
+VibeFlix Windows is a native WinUI 3 desktop app targeting .NET 10 and Windows App SDK 2.7. It uses the same Server 1 and Server 2 catalog resources as the Android client; catalog page paths are identifiers, not playable stream URLs. A stream is resolved only after the user chooses **Play**, then passed to the Windows-native media player. Stream addresses, provider headers, and credentials are not saved to disk.
+
+The original VibeFlix interface uses a compact brand/navigation/search/source header, a cinematic feature area, category controls, and horizontal title shelves. It follows broad desktop streaming conventions without copying Netflix branding, assets, or screens. The included generated artwork is design/placeholder art, not catalog content or playable media.
 
 ## Project layout
 
 - `VibeFlix.sln` — Visual Studio solution for the Windows client.
 - `VibeFlix.Windows/` — WinUI 3 app targeting .NET 10 and Windows App SDK 2.7.0.
-- `VibeFlix.Windows/MainWindow.xaml` and `MainWindow*.cs` — desktop shell, catalogue/library views, local-player dialog, and keyboard/mouse controls.
-- `VibeFlix.Windows/Models/` and `Services/DemoCatalog.cs` — fictional sample metadata only; no provider catalogue or playable media is bundled.
-- `VibeFlix.Windows/Assets/glass-orbit-hero.png` — original generated illustration for the sample feature; artwork only, not playable media or provider artwork.
-- `VibeFlix.Windows/Services/LocalLibraryStore.cs` — local JSON persistence for My List, History, and per-title/per-episode playback positions. It never saves the selected file path.
-- `VibeFlix.Windows/Services/WindowsPlaybackService.cs` — a separate `Windows.Media.Playback.MediaPlayer` service for local `StorageFile` playback. It has no URI/stream resolver.
+- `VibeFlix.Windows/MainWindow.xaml` and `MainWindow*.cs` — desktop shell, catalog/library views, title details, episode selection, and provider playback UI.
+- `VibeFlix.Windows/Models/` — catalog title, season, episode, and provider-page metadata.
+- `VibeFlix.Windows/Services/CatalogSourceService.cs` — Server 1 / Server 2 catalog, details, season, and episode requests.
+- `VibeFlix.Windows/Services/ProviderPlaybackService.cs` — on-demand provider stream resolution. Resolved media addresses are held in memory only.
+- `VibeFlix.Windows/Services/WindowsPlaybackService.cs` — Windows `MediaPlayer` wrapper for provider-resolved HLS and MP4 sources.
+- `VibeFlix.Windows/Services/LocalLibraryStore.cs` — local JSON persistence for My List, History, known provider title metadata, and per-title/per-episode progress. It does not save stream URLs, provider headers/credentials, or media paths.
+- `VibeFlix.Windows/Assets/*.png` — original generated VibeFlix artwork; these files are not provider posters or media.
+- `VibeFlix.Windows.Tests/` — dependency-free smoke tests for library progress, metadata persistence, legacy JSON compatibility, and clearing local data.
 
-## Local playback behavior
+## Catalog and playback behavior
 
-- From a title or episode, choose **Play a local video**. Windows opens a file picker; select a file you are authorized to play. The demo catalogue contains no playable media, and the app does not upload or copy the selected file.
-- Play/Pause and the seek slider use the Windows media playback session. Movie progress and episode progress are stored locally, keyed by catalogue title and stable season/episode key. Progress is checkpointed during playback and on pause, seek, and player close. Reaching 95% removes that resume marker; a movie or a series' final episode is added to local History.
-- The selected `StorageFile` is cached only in memory for the current app session so previous/next episode navigation can reuse an already selected file. It is discarded when the app closes. After restarting, resume asks the user to choose the same local file again; this is intentional so paths and permissions are not persisted.
-- Previous/next episode navigation opens a file picker for episodes without an in-session file selection. Each episode has its own local resume position.
-- Captions default to **Off**. The caption picker lists only caption/subtitle timed-metadata tracks supplied by the selected media file. Selecting a track requests `TimedMetadataTrackPresentationMode.PlatformPresented`; no sample text is displayed or treated as captions. Audio-track selection and external sidecar-caption import are not part of this slice.
-- Supported containers and codecs depend on the installed Windows media components. The picker includes common video extensions, but an extension does not guarantee that Windows can decode a file.
+- Browse and search the available Server 1 and Server 2 catalogs, with a source selector, categories, and pagination where the selected provider exposes them. Provider availability and content can vary by region and over time; an unavailable provider is reported in the UI.
+- Selecting a title loads provider metadata. Series seasons and episode lists are loaded from the relevant provider resources when needed.
+- Choosing **Play** resolves the selected provider page into supported HTTPS HLS or MP4 candidates. For adaptive HLS, Windows receives provider request headers through its adaptive-streaming client. The app does not derive a stream URL from a catalog path or persist a resolved stream address.
+- A provider may be unavailable, restrict a request, change its response format, or return media Windows cannot play. In those cases, playback can fail even when catalog browsing works. Server 2 may return multiple candidates; **Try another stream** allows trying another candidate.
+- The Windows player exposes the platform's transport controls. Resume positions are stored per title and, for series, per stable season/episode key. Progress is checkpointed during playback and when the details/player dialog closes. A completed movie or final series episode is added to local History; completing a non-final episode only clears that episode's resume marker.
+- Captions/audio track availability depends on the provider stream and Windows media support. No stream format, codec, subtitle track, or provider uptime is guaranteed by the app.
+- My List, History, title metadata, and resume positions are local to this Windows device. Windows Supabase authentication/cloud library sync is not implemented. Android's manual sync behavior is not changed.
 
-No authorized test media is bundled. For playback checks, use a local video file that you own or otherwise have permission to use; to check captions, use a file with an embedded timed-text track. The app does not contact a media provider.
+Use the app only with provider content you are authorized to access. No playable media is bundled, and no media file picker is part of the provider playback flow.
 
-## Remaining scope
+## UX research and visual direction
 
-Server 1 / Server 2 catalogue adapters, provider authentication and stream resolution, real audio-track selection, external caption-file import, optional cloud sync, and release packaging are later work. Keep sync local-first and explicitly opt-in if it is added. Never sync playback URLs, file paths, or provider credentials.
+The source-based research and original VibeFlix direction are in [`UX-RESEARCH.md`](UX-RESEARCH.md). The current Netflix Windows product form is described by its Store listing as a web-based app, and Netflix Help documents Windows/computer workflows; this workspace has no Windows desktop session, so the installed product's exact current screens, version, and resize behavior remain unverified. The attached `gemini-code-1795349551770.md` was reviewed as a secondary visual summary, not as an official Figma file or verified screenshot set. Only broad dark-canvas, restrained-accent, and desktop-usability ideas are treated as adaptable; its implementation suggestions and unverified product claims are not copied into the native WinUI app. VibeFlix keeps its own identity and does not claim a pixel-level Netflix reproduction.
 
-## UX research gate
-
-The source-based research and original VibeFlix design direction are in [`UX-RESEARCH.md`](UX-RESEARCH.md). The current US and Pakistan Microsoft Store listings identify Netflix, Inc.'s Windows product as a web-based app that auto-updates; Netflix Help says Edge must be installed and that Windows downloads are no longer supported. The current Store pages did not expose a build number or inspectable screenshots, and this workspace has no Windows desktop session, so Netflix's actual current screens and resize behavior remain unverified. The current VibeFlix UI is an original, Netflix-inspired browsing design—not a pixel-level reproduction or a claim of hands-on benchmarking against the current Windows client. Before visual polish is treated as final, inspect the latest Store build (or review captures from it) across Home, navigation, search/categories, title details, My List, Continue Watching, local playback, keyboard/mouse, and window sizes. Do not copy Netflix branding, icons, artwork, or screens pixel-for-pixel.
+Before visual polish is considered final, review the running app on Windows at compact and wide window sizes. Check catalog loading/errors, title details, My List, Continue Watching, episode selection, native player controls, keyboard/focus behavior, and accessibility names. CI compilation cannot verify provider availability, stream formats, codecs, captions, or runtime playback behavior.
 
 ## Build and verification
 
-This workspace has no local .NET/Windows build tools, so a native Windows compilation cannot be run here. `.github/workflows/build-windows.yml` runs the local progress-store smoke tests, compiles the app on a Windows GitHub Actions runner using the .NET 10 SDK, and uploads a short-lived x64 test-build artifact after a successful build. Download it from the latest successful **Build Windows client** run's **Artifacts** section. The ZIP is an unpackaged test bundle, not an installer; extract the entire folder and keep its files together.
+This workspace has no local .NET/Windows build tools, so native compilation must be checked on a Windows runner. `.github/workflows/build-windows.yml` runs the local-library smoke tests, builds the app on a Windows GitHub Actions runner using the .NET 10 SDK, and uploads a short-lived x64 test-build artifact after a successful build. Download it from the latest successful **Build Windows client** run's **Artifacts** section. The ZIP is an unpackaged test bundle, not an installer; extract the entire folder and keep its files together.
 
 On a Windows development machine with the .NET 10 SDK and Windows App SDK prerequisites available:
 
@@ -43,4 +47,4 @@ dotnet restore windows/VibeFlix.Windows/VibeFlix.Windows.csproj -p:Platform=x64
 dotnet build windows/VibeFlix.Windows/VibeFlix.Windows.csproj --configuration Release --no-restore -p:Platform=x64
 ```
 
-After a successful build, manually verify that the window launches; a local video opens and plays; Play/Pause and seeking work; choosing a real embedded timed-text track displays that track while **Off** remains the default; episodes navigate and maintain separate resume positions; and resuming after relaunch prompts for the local file again. Inspect the local JSON file to confirm it stores episode keys/positions but not media paths. Also check keyboard/mouse focus and compact/wide window layouts. CI compilation cannot verify Windows playback, codec availability, track rendering, or file-picker behavior. This prototype does not yet produce an installer or release package.
+For a runtime check, browse provider catalogs while online, open details and seasons, and try playback only with content you are authorized to access. Confirm that an unsupported/offline stream produces a clear error, another candidate can be tried where available, resume positions remain episode-specific, and the local JSON file does not contain a stream address or provider credential. Windows CI compilation alone cannot validate provider responses or live playback. This prototype does not yet produce an installer or release package.

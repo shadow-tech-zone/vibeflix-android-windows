@@ -1,8 +1,8 @@
 namespace VibeFlix.Windows.Models;
 
 /// <summary>
-/// UI-facing title metadata. The Windows preview uses fictional sample entries and keeps
-/// provider records and playable stream addresses out of the desktop shell.
+/// UI-facing metadata adapted from the same catalog entries used by the Android client.
+/// Catalog paths identify provider pages only; they are never playable stream URLs.
 /// </summary>
 public sealed record CatalogTitle
 {
@@ -16,11 +16,13 @@ public sealed record CatalogTitle
         string Synopsis,
         string Language,
         string Source,
-        string[] Genres,
+        IReadOnlyList<string> Genres,
         string AccentStart,
         string AccentEnd,
         bool IsNew = false,
-        MediaSeason[]? Seasons = null)
+        IReadOnlyList<MediaSeason>? Seasons = null,
+        string CatalogPath = "",
+        string PosterUrl = "")
     {
         this.Id = Id;
         this.Name = Name;
@@ -31,11 +33,13 @@ public sealed record CatalogTitle
         this.Synopsis = Synopsis;
         this.Language = Language;
         this.Source = Source;
-        this.Genres = Array.AsReadOnly(Genres);
+        this.Genres = Array.AsReadOnly((Genres ?? Array.Empty<string>()).ToArray());
         this.AccentStart = AccentStart;
         this.AccentEnd = AccentEnd;
         this.IsNew = IsNew;
-        this.Seasons = Array.AsReadOnly(Seasons ?? Array.Empty<MediaSeason>());
+        this.Seasons = Array.AsReadOnly((Seasons ?? Array.Empty<MediaSeason>()).ToArray());
+        this.CatalogPath = CatalogPath;
+        this.PosterUrl = PosterUrl;
     }
 
     public string Id { get; init; }
@@ -52,25 +56,41 @@ public sealed record CatalogTitle
     public string AccentStart { get; init; }
     public string AccentEnd { get; init; }
     public IReadOnlyList<MediaSeason> Seasons { get; init; }
+    public string CatalogPath { get; init; }
+    public string PosterUrl { get; init; }
 
     public bool IsSeries => string.Equals(Kind, "Series", StringComparison.OrdinalIgnoreCase);
 
-    public string RuntimeLabel => IsSeries ? "Series" : $"{RuntimeMinutes} min";
+    public string RuntimeLabel => RuntimeMinutes > 0
+        ? $"{RuntimeMinutes} min"
+        : IsSeries ? "Series" : "Movie";
 
-    public string CardMetadata => $"{Year}  ·  {Kind}  ·  {Source}";
+    public string CardMetadata => string.Join("  ·  ", new[]
+    {
+        Year > 0 ? Year.ToString() : string.Empty,
+        Kind,
+        Source
+    }.Where(part => !string.IsNullOrWhiteSpace(part)));
 }
 
-public sealed record MediaSeason(int Number, IReadOnlyList<MediaEpisode> Episodes)
+public sealed record MediaSeason(
+    int Number,
+    IReadOnlyList<MediaEpisode> Episodes,
+    string Path = "",
+    string Name = "")
 {
-    public string Label => $"Season {Number}  ·  {Episodes.Count} episodes";
+    public string Label => !string.IsNullOrWhiteSpace(Name)
+        ? $"{Name}  ·  {Episodes.Count} episodes"
+        : $"Season {Number}  ·  {Episodes.Count} episodes";
 }
 
 /// <summary>
-/// Episode metadata for local-file playback navigation. Media files and timed-text tracks are
-/// selected by the user at playback time and are not part of this fictional catalogue record.
+/// Episode metadata from a provider. Its catalog path identifies an episode page, never a stream.
 /// </summary>
 public sealed record MediaEpisode(
     int Number,
     string Name,
     string Synopsis,
-    int RuntimeMinutes);
+    int RuntimeMinutes,
+    string CatalogPath = "",
+    string ThumbnailUrl = "");
