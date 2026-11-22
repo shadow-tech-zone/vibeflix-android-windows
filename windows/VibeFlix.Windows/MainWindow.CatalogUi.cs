@@ -3,11 +3,12 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Microsoft.UI.Text;
 using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
 using Windows.Foundation;
 using Windows.UI;
-using Windows.UI.Text;
 
 namespace VibeFlix.Windows;
 

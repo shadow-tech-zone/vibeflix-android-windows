@@ -1,7 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Controls;
-using Windows.UI.Text;
 using VibeFlix.Windows.Models;
 
 namespace VibeFlix.Windows;
