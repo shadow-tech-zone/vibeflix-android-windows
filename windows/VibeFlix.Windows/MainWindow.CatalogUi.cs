@@ -9,6 +9,7 @@ using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
 using Windows.Foundation;
 using Windows.UI;
+using Windows.UI.Text;
 
 namespace VibeFlix.Windows;
 
