@@ -153,7 +153,7 @@ public sealed partial class MainWindow
         try
         {
             var fileUri = new System.Uri(path, System.UriKind.Absolute);
-            _sampleHeroArtwork = new BitmapImage(new Windows.Foundation.Uri(fileUri.AbsoluteUri));
+            _sampleHeroArtwork = new BitmapImage(new global::Windows.Foundation.Uri(fileUri.AbsoluteUri));
             return _sampleHeroArtwork;
         }
         catch (Exception)
