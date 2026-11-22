@@ -112,7 +112,7 @@ public sealed class ProviderPlaybackService : IDisposable
 
         var stream = ResolvePlay4uStream(document.DocumentNode.OuterHtml);
         return new PlaybackResolution(
-            [new ResolvedStream(stream, "application/x-mpegURL", "Server 1", ProviderHeaders("Server 1"))],
+            new[] { new ResolvedStream(stream, "application/x-mpegURL", "Server 1", ProviderHeaders("Server 1")) },
             resolvedCatalogPath);
     }
 
