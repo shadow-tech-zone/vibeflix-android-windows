@@ -21,7 +21,7 @@ public sealed partial class MainWindow
 {
     private async void ShowTitleDetails(CatalogTitle title, ProgressEntry? resumeProgress = null)
     {
-        var dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         var dialog = new ContentDialog
         {
             Title = title.Name,
@@ -56,6 +56,17 @@ public sealed partial class MainWindow
         var currentFile = (StorageFile?)null;
         var pendingResumePosition = (TimeSpan?)null;
         var selectedCaptionTrackKey = (string?)null;
+        TextBlock playerEpisodeText = null!;
+        TextBlock localFileText = null!;
+        Button chooseFileButton = null!;
+        Button playPauseButton = null!;
+        Slider timelineSlider = null!;
+        TextBlock timelineText = null!;
+        ComboBox captionPicker = null!;
+        TextBlock captionStatus = null!;
+        Button previousEpisodeButton = null!;
+        Button nextEpisodeButton = null!;
+        DispatcherTimer progressTimer = null!;
         var isUpdatingCaptionPicker = false;
         var isUpdatingTimeline = false;
         var isUserSeeking = false;
@@ -143,8 +154,8 @@ public sealed partial class MainWindow
             detailsPanel.Children.Add(episodeList);
         }
 
-        var playerEpisodeText = CreateText(title.Name, 18, "#E9ECF2", FontWeights.SemiBold, TextWrapping.Wrap);
-        var localFileText = CreateText(
+        playerEpisodeText = CreateText(title.Name, 18, "#E9ECF2", FontWeights.SemiBold, TextWrapping.Wrap);
+        localFileText = CreateText(
             "No local video selected. The demo catalogue does not contain playable media.",
             11, "#A2ADBE", TextWrapping.Wrap);
         var mediaPlayerElement = new MediaPlayerElement
@@ -170,17 +181,17 @@ public sealed partial class MainWindow
         playerPanel.Children.Add(localFileText);
 
         var playbackActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var chooseFileButton = CreateActionButton("Choose local video", () =>
+        chooseFileButton = CreateActionButton("Choose local video", () =>
         {
             _ = OpenPlayerAsync(selectedEpisodeIndex, resumeProgress: null, forcePicker: true);
         });
-        var playPauseButton = CreateActionButton("Play", TogglePlayback, isPrimary: true);
+        playPauseButton = CreateActionButton("Play", TogglePlayback, isPrimary: true);
         playPauseButton.IsEnabled = false;
         playbackActions.Children.Add(chooseFileButton);
         playbackActions.Children.Add(playPauseButton);
         playerPanel.Children.Add(playbackActions);
 
-        var timelineSlider = new Slider
+        timelineSlider = new Slider
         {
             Minimum = 0,
             Maximum = 1000,
@@ -190,7 +201,7 @@ public sealed partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         AutomationProperties.SetName(timelineSlider, "Playback position");
-        var timelineText = CreateText("00:00 / 00:00", 11, "#AEB8C8");
+        timelineText = CreateText("00:00 / 00:00", 11, "#AEB8C8");
         timelineSlider.ValueChanged += (_, _) =>
         {
             if (isUserSeeking && !isUpdatingTimeline)
@@ -220,7 +231,7 @@ public sealed partial class MainWindow
 
         var captionControls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         captionControls.Children.Add(CreateText("Captions", 12, "#D4D9E2", FontWeights.SemiBold));
-        var captionPicker = new ComboBox
+        captionPicker = new ComboBox
         {
             Width = 280,
             IsEnabled = false,
@@ -229,7 +240,7 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(captionPicker, "Select a timed-text caption track");
         captionPicker.Items.Add(new ComboBoxItem { Content = "Off", Tag = string.Empty });
         captionPicker.SelectedIndex = 0;
-        var captionStatus = CreateText(
+        captionStatus = CreateText(
             "Captions are off by default. Only timed-text tracks supplied by the selected media file are listed.",
             10, "#909CAD", TextWrapping.Wrap);
         captionPicker.SelectionChanged += (_, _) =>
@@ -255,11 +266,11 @@ public sealed partial class MainWindow
         playerPanel.Children.Add(captionStatus);
 
         var episodeNavigation = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var previousEpisodeButton = CreateActionButton("← Previous episode", () =>
+        previousEpisodeButton = CreateActionButton("← Previous episode", () =>
         {
             _ = NavigateEpisode(-1);
         });
-        var nextEpisodeButton = CreateActionButton("Next episode →", () =>
+        nextEpisodeButton = CreateActionButton("Next episode →", () =>
         {
             _ = NavigateEpisode(1);
         });
@@ -276,7 +287,7 @@ public sealed partial class MainWindow
             dialog.Title = title.Name;
         }));
 
-        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        progressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         progressTimer.Tick += (_, _) =>
         {
             if (currentItem is null)
