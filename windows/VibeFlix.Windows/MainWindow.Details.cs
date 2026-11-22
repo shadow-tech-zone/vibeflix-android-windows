@@ -41,6 +41,7 @@ public sealed partial class MainWindow
 
         var selectedEpisodeIndex = -1;
         var captionsPreviewEnabled = false;
+        Action<int?> openPlayerPreview = _ => { };
 
         var detailGrid = new Grid { ColumnSpacing = 16 };
         detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
@@ -66,7 +67,7 @@ public sealed partial class MainWindow
             () => ToggleSavedFromDetails(title, listButton, statusText));
         actions.Children.Add(listButton);
         actions.Children.Add(CreateActionButton("Mark watched", () => MarkWatchedFromDetails(title, statusText)));
-        actions.Children.Add(CreateActionButton("Open player preview", () => OpenPlayerPreview(null)));
+        actions.Children.Add(CreateActionButton("Open player preview", () => openPlayerPreview(null)));
         description.Children.Add(actions);
         description.Children.Add(statusText);
         Grid.SetColumn(description, 1);
@@ -100,7 +101,7 @@ public sealed partial class MainWindow
                     var episode = season.Episodes[episodeIndex];
                     var episodeButton = CreateActionButton(
                         $"{episode.Number:00}  ·  {episode.Name}  ·  {episode.RuntimeMinutes} min",
-                        () => OpenPlayerPreview(option));
+                        () => openPlayerPreview(option));
                     episodeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
                     episodeButton.HorizontalContentAlignment = HorizontalAlignment.Left;
                     AutomationProperties.SetHelpText(episodeButton, episode.Synopsis);
@@ -260,6 +261,7 @@ public sealed partial class MainWindow
             }
         }
 
+        openPlayerPreview = OpenPlayerPreview;
         body.Children.Add(detailsPanel);
         body.Children.Add(playerPanel);
         scroll.Content = body;

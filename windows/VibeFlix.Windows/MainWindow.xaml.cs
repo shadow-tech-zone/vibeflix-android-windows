@@ -226,8 +226,7 @@ public sealed partial class MainWindow : Window
         {
             PageContent.Children.Add(CreateCompactEmptyState(
                 "Continue watching",
-                "Your resume list is clear.",
-                "When a real player is connected, local progress will appear here. The title preview can add a clearly marked sample progress marker for layout testing."));
+                "Your resume list is clear. When a real player is connected, local progress will appear here. The title preview can add a clearly marked sample progress marker for layout testing."));
         }
 
         var saved = GetVisibleSavedTitles();
