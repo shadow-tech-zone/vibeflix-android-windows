@@ -23,6 +23,8 @@ jobs:
   verify:
     name: Unit tests and debug package verification
     runs-on: ubuntu-latest
+    env:
+      VIBEFLIX_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VIBEFLIX_SUPABASE_PUBLISHABLE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,6 +92,34 @@ jobs:
           printf 'sdk.dir=%s\n' "${ANDROID_HOME:-/usr/local/lib/android/sdk}" > local.properties
           chmod +x gradlew
 
+      - name: Check the client-key build configuration
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+
+          key = os.environ.get('VIBEFLIX_SUPABASE_PUBLISHABLE_KEY', '').strip()
+          if not key:
+              print('::warning::VIBEFLIX_SUPABASE_PUBLISHABLE_KEY is unset; this debug APK will have cloud sign-in disabled.')
+              raise SystemExit(0)
+          if key.startswith('sb_secret_'):
+              raise SystemExit('A Supabase secret key must never be embedded in an Android client.')
+          if key.startswith('sb_publishable_'):
+              print('Supabase publishable client key is configured for this debug build.')
+              raise SystemExit(0)
+          try:
+              payload = key.split('.')[1]
+              payload += '=' * (-len(payload) % 4)
+              claims = json.loads(base64.urlsafe_b64decode(payload.encode('ascii')))
+          except Exception:
+              raise SystemExit('The Android build key is not a recognized publishable/anon client key.')
+          if claims.get('role') != 'anon':
+              raise SystemExit('Only a Supabase anon/publishable client key may be embedded in the Android build.')
+          print('Legacy Supabase anon client key is configured for this debug build.')
+          PY
+
       - name: Run offline unit tests
         run: |
           set -euo pipefail
@@ -147,3 +177,11 @@ jobs:
           [[ "$BADGING" == *"versionCode='$RELEASE_VERSIONCODE'"* ]]
           [[ "$BADGING" == *"versionName='$RELEASE_VERSIONNAME'"* ]]
           echo 'Debug package metadata verified. This does not verify signed-release credentials or live playback.'
+
+      - name: Upload debug APK for private device testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibeflix-debug-apk-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ANDROID_PROJECT }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

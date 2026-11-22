@@ -9,12 +9,12 @@ This is the private repository for the next Vibeflix phase.
 - **Android baseline:** The canonical source archive is `android/vibeflix-v31-source.zip`. The latest Android PR CI run [44968003888](https://github.com/shadow-tech-zone/vibeflix-android-windows/actions/runs/44968003888) passed offline unit tests and debug-package verification. A new signed release is blocked until an approved, non-exposed signing key and fingerprint are configured securely.
 - **Sync:** Supabase project `vibeflix-sync` is running in `ap-southeast-1`. Android source now includes explicitly consented, local-first sync for My List; latest History per title; per-episode resume/progress; Continue Watching hidden state; title-removal tombstones; and a Clear all History watermark. Live SQL checks of timestamp clamping, clear/removal guards, removal ties, hidden-state transitions, and progress completion passed with test fixtures cleaned up. Cloud payloads use canonical catalog metadata and episode keys only—not stream/playback URLs or provider credentials. The refreshed archive passed CI run [44968003888](https://github.com/shadow-tech-zone/vibeflix-android-windows/actions/runs/44968003888); the publishable-key Actions variable, real Auth/PostgREST isolation, and device-to-device sync remain unverified. See [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md).
 - **Windows:** The new native desktop client is planned but has not been scaffolded yet.
-- **Releases:** This repository has no published release yet. Do not share test/download links until a release is published with its APK asset attached.
+- **Releases:** This repository has no published release yet. The debug APK is available only as a private seven-day Actions artifact for device testing; there is no public download link.
 
 ## Repository layout
 
 - `android/vibeflix-v31-source.zip` — source of truth for the existing Java/Media3 Android app; CI extracts and patches it.
-- `.github/workflows/build-phone.yml` — offline unit tests and debug package metadata verification only; it creates no download link.
+- `.github/workflows/build-phone.yml` — offline unit tests, debug package verification, and a private seven-day Actions artifact for device testing; it is not a public release link.
 - `.github/workflows/release-phone.yml` — gated signed-release flow; requires protected signing secrets, a compatible rotation lineage, and the approved certificate fingerprint.
 - `release.json` — versionCode, versionName, tag, asset name, and title for the next Android release.
 - `supabase/migrations/` — versioned SQL applied to the remote Vibeflix sync project.
