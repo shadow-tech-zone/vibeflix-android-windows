@@ -17,11 +17,17 @@
 3. Run the Android verify workflow. It runs tests and checks debug package metadata; it does not prove signed-release behavior or live playback.
 4. For a release, increment `versionCode` and update `versionName`, `tag`, `asset`, and `title` in `release.json`. Never reuse a tag.
 
+## Windows changes
+
+- Build the fresh WinUI 3/.NET app in `windows/`; do not revive the removed WPF prototype or reuse Android Media3 code.
+- Keep desktop navigation usable with both keyboard and mouse, preserve the original dark visual direction, and use the independent Windows playback stack.
+- Follow `windows/README.md` for local commands. The Windows Actions workflow performs the compile check because this workspace has no Windows/.NET toolchain.
+
 ## Other platforms and sync
 
 - Keep platform UIs native; avoid Electron/web-wrapper approaches.
 - Keep Supabase client configuration free of service-role credentials. Use only approved publishable/anon values at runtime and secure token storage on each platform.
-- Test RLS isolation for every user-owned table before enabling sync.
+- Test RLS isolation for every user-owned table before relying on cross-user or cross-device sync. An unfinished validation is not a Windows development blocker.
 
 ## Release discipline
 

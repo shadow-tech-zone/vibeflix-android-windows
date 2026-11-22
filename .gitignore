@@ -5,6 +5,12 @@
 *.iml
 .idea/
 
+# .NET / WinUI build output
+**/bin/
+**/obj/
+.vs/
+TestResults/
+
 # Generated install/release artifacts
 *.apk
 *.aab

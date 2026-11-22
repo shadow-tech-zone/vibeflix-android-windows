@@ -4,9 +4,9 @@
 
 ## Purpose
 
-Vibeflix is a personal native Android app with a dark cinematic interface and a Media3-based player. The Android app remains the primary product and must keep working independently of any future account or Windows client.
+Vibeflix is a personal native Android app with a dark cinematic interface and a Media3-based player. The Android app remains the primary product and must keep working independently of the new Windows client and any future Windows account features.
 
-The roadmap may add a fresh native Windows desktop app after Android sync is fully validated. Supabase is deployed, and Android source now contains sign-in/session-storage groundwork plus explicit-consent, local-first My List, latest-History, episode-resume/progress, Continue Watching visibility, and deletion/Clear-all sync. The publishable-key configuration, live Auth, real PostgREST RLS, and physical-device sync remain unverified. The refreshed Android archive passed offline tests/debug-package verification in CI run [44968003888](https://github.com/shadow-tech-zone/vibeflix-android-windows/actions/runs/44968003888). Stream/playback URLs and provider credentials are excluded from sync payloads; the existing Android behavior continues to work on-device.
+Windows development has started now, by the user's explicit decision to defer the second-Android-install restore test. The Android debug APK signed in successfully on the user's device, and live Supabase queries confirmed cloud writes, including a resumable checkpoint. Cross-device restore and real-token cross-user RLS isolation remain unverified; do not describe either as passed. The Android archive and private debug-artifact workflow passed CI run [44968893035](https://github.com/shadow-tech-zone/vibeflix-android-windows/actions/runs/44968893035). Supabase sync remains opt-in and local-first, and cloud payloads exclude stream/playback URLs and provider credentials. The fresh Windows app is a native WinUI 3/.NET shell with its own Windows playback foundation; see [`../windows/README.md`](../windows/README.md). Android remains the primary product and must continue working independently.
 
 ## Current Android behavior
 
