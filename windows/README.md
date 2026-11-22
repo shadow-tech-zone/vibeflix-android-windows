@@ -1,13 +1,14 @@
 # Windows client
 
-VibeFlix Windows is a native WinUI 3 desktop app. It does not revive the removed WPF prototype and does not reuse Android's Media3 player. The sample catalogue remains fictional and is never presented as a provider catalogue. The current playback slice opens user-selected local media through `Windows.Media.Playback`; no provider stream, credential, or media path is invented or persisted.
+VibeFlix Windows is a native WinUI 3 desktop app. It does not revive the removed WPF prototype and does not reuse Android's Media3 player. Its desktop browsing flow now uses a compact branded header, horizontal top navigation, a cinematic featured-title panel, and scrollable title shelves—streaming-app conventions adapted with VibeFlix styling, not a pixel-for-pixel Netflix copy. The catalogue and the original generated hero illustration are clearly identified as samples; no provider catalogue or playable media is bundled. The current playback slice opens user-selected local media through `Windows.Media.Playback`; no provider stream, credential, or media path is invented or persisted.
 
 ## Project layout
 
 - `VibeFlix.sln` — Visual Studio solution for the Windows client.
 - `VibeFlix.Windows/` — WinUI 3 app targeting .NET 10 and Windows App SDK 2.7.0.
 - `VibeFlix.Windows/MainWindow.xaml` and `MainWindow*.cs` — desktop shell, catalogue/library views, local-player dialog, and keyboard/mouse controls.
-- `VibeFlix.Windows/Models/` and `Services/DemoCatalog.cs` — fictional sample metadata only; no provider catalogue or media is bundled.
+- `VibeFlix.Windows/Models/` and `Services/DemoCatalog.cs` — fictional sample metadata only; no provider catalogue or playable media is bundled.
+- `VibeFlix.Windows/Assets/glass-orbit-hero.png` — original generated illustration for the sample feature; artwork only, not playable media or provider artwork.
 - `VibeFlix.Windows/Services/LocalLibraryStore.cs` — local JSON persistence for My List, History, and per-title/per-episode playback positions. It never saves the selected file path.
 - `VibeFlix.Windows/Services/WindowsPlaybackService.cs` — a separate `Windows.Media.Playback.MediaPlayer` service for local `StorageFile` playback. It has no URI/stream resolver.
 
@@ -28,7 +29,7 @@ Server 1 / Server 2 catalogue adapters, provider authentication and stream resol
 
 ## UX research gate
 
-The source-based research and original VibeFlix design direction are in [`UX-RESEARCH.md`](UX-RESEARCH.md). The current US and Pakistan Microsoft Store listings identify Netflix, Inc.'s Windows product as a web-based app that auto-updates; Netflix Help says Edge must be installed and that Windows downloads are no longer supported. The current Store pages did not expose a build number or inspectable screenshots, and this workspace has no Windows desktop session, so Netflix's actual current screens and resize behavior remain unverified. The first VibeFlix UI is based on documented interaction lessons and original styling—not a claim of hands-on Netflix benchmarking. Before visual polish is treated as final, inspect the latest Store build (or review captures from it) across Home, navigation, search/categories, title details, My List, Continue Watching, local playback, keyboard/mouse, and window sizes. Do not copy Netflix branding, icons, artwork, or screens pixel-for-pixel.
+The source-based research and original VibeFlix design direction are in [`UX-RESEARCH.md`](UX-RESEARCH.md). The current US and Pakistan Microsoft Store listings identify Netflix, Inc.'s Windows product as a web-based app that auto-updates; Netflix Help says Edge must be installed and that Windows downloads are no longer supported. The current Store pages did not expose a build number or inspectable screenshots, and this workspace has no Windows desktop session, so Netflix's actual current screens and resize behavior remain unverified. The current VibeFlix UI is an original, Netflix-inspired browsing design—not a pixel-level reproduction or a claim of hands-on benchmarking against the current Windows client. Before visual polish is treated as final, inspect the latest Store build (or review captures from it) across Home, navigation, search/categories, title details, My List, Continue Watching, local playback, keyboard/mouse, and window sizes. Do not copy Netflix branding, icons, artwork, or screens pixel-for-pixel.
 
 ## Build and verification
 

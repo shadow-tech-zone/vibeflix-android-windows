@@ -5,6 +5,7 @@ using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
 using Windows.Storage;
 using Windows.System;
+using Windows.UI.Text;
 
 namespace VibeFlix.Windows;
 
@@ -18,7 +19,6 @@ public sealed partial class MainWindow : Window
     private string _activeFilter = "All";
     private string? _activeGenre;
     private bool _suppressSearchEvents;
-    private bool _compactNavigation;
     private bool _rendering;
     private double _lastContentWidth = -1;
     private Action? _flushPlaybackOnClose;
@@ -49,10 +49,23 @@ public sealed partial class MainWindow : Window
 
     private void NavigationButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: string destination })
+        if (sender is not Button { Tag: string destination })
         {
-            NavigateTo(destination);
+            return;
         }
+
+        if (destination is "Movies" or "Series")
+        {
+            _currentPage = "Home";
+            _activeFilter = destination;
+            _activeGenre = null;
+            SetSearchTextSilently(string.Empty);
+            UpdateNavigationState();
+            RenderCurrentPage(resetScroll: true);
+            return;
+        }
+
+        NavigateTo(destination);
     }
 
     private void NavigateTo(string destination)
@@ -131,38 +144,10 @@ public sealed partial class MainWindow : Window
 
     private void AppRoot_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        var compact = e.NewSize.Width < 1010;
-        if (compact != _compactNavigation)
-        {
-            _compactNavigation = compact;
-            NavigationColumn.Width = new GridLength(compact ? 76 : 232);
-            NavigationSidebar.Padding = compact
-                ? new Thickness(8, 24, 8, 18)
-                : new Thickness(14, 24, 14, 18);
-
-            NavigationCaption.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            LocalOnlyDescription.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            LocalOnlyTitle.Text = compact ? "LOCAL" : "LOCAL FIRST";
-            LocalOnlyCard.Padding = compact ? new Thickness(10) : new Thickness(14);
-
-            foreach (var button in NavigationButtons())
-            {
-                button.HorizontalContentAlignment = compact
-                    ? HorizontalAlignment.Center
-                    : HorizontalAlignment.Stretch;
-            }
-
-            foreach (var label in NavigationLabels())
-            {
-                label.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            }
-
-            UpdateNavigationState();
-        }
-
-        BrandSubtitle.Visibility = e.NewSize.Width < 1160 ? Visibility.Collapsed : Visibility.Visible;
-        PreviewBadge.Visibility = e.NewSize.Width < 830 ? Visibility.Collapsed : Visibility.Visible;
-        ServerPicker.Width = e.NewSize.Width < 920 ? 132 : 150;
+        BrandSubtitle.Visibility = e.NewSize.Width < 960 ? Visibility.Collapsed : Visibility.Visible;
+        PreviewBadge.Visibility = e.NewSize.Width < 930 ? Visibility.Collapsed : Visibility.Visible;
+        SearchBox.Width = e.NewSize.Width < 680 ? 126 : e.NewSize.Width < 900 ? 190 : 270;
+        ServerPicker.Width = e.NewSize.Width < 680 ? 112 : e.NewSize.Width < 900 ? 128 : 148;
     }
 
     private void PageScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -228,44 +213,17 @@ public sealed partial class MainWindow : Window
 
     private void RenderHome()
     {
-        PageContent.Children.Add(CreatePageHeader(
-            "HOME  /  YOUR LIBRARY",
-            "Make room for a good story.",
-            "A desktop-first home for browsing, saving, and picking up where you left off."));
-        PageContent.Children.Add(CreatePreviewNotice());
-        PageContent.Children.Add(CreateHero());
-        PageContent.Children.Add(CreateBrowseFilters());
-
-        var progress = GetVisibleProgress();
-        if (progress.Count > 0)
-        {
-            PageContent.Children.Add(CreateSectionHeading("Continue watching", "LOCAL RESUME"));
-            PageContent.Children.Add(CreateProgressShelf(progress));
-        }
-        else
-        {
-            PageContent.Children.Add(CreateCompactEmptyState(
-                "Continue watching",
-                "Your resume list is clear. Choose a local video file from a title's player view; real positions are saved per episode and never uploaded."));
-        }
-
-        var saved = GetVisibleSavedTitles();
-        if (saved.Count > 0)
-        {
-            PageContent.Children.Add(CreateSectionHeading("Your list", $"{saved.Count} SAVED"));
-            PageContent.Children.Add(CreateTitleShelf(saved.Take(8).ToArray()));
-        }
-
         var visible = GetVisibleCatalog();
-        PageContent.Children.Add(CreateSectionHeading(
-            _activeGenre is null ? "Browse sample titles" : $"{_activeGenre} picks",
-            $"{visible.Count} PREVIEW TITLES"));
-
         if (visible.Count == 0)
         {
+            PageContent.Children.Add(CreatePageHeader(
+                "VIBEFLIX  /  SAMPLE CATALOGUE",
+                "Nothing matches this view.",
+                "Try another source, category, or genre to see more of the fictional sample catalogue."));
+            PageContent.Children.Add(CreatePreviewNotice());
             PageContent.Children.Add(CreateEmptyState(
-                "Nothing matches these filters.",
-                "Try another source, category, or genre to see more of the preview catalogue.",
+                "No titles match these filters.",
+                "Clear the selected filters to return to the featured sample titles.",
                 "Clear filters",
                 () =>
                 {
@@ -277,7 +235,58 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        PageContent.Children.Add(CreateResponsiveTitleGrid(visible));
+        var featured = visible.FirstOrDefault(title => title.Id == "the-glass-orbit") ?? visible[0];
+        PageContent.Children.Add(CreateHero(featured));
+        PageContent.Children.Add(CreatePreviewNotice());
+        PageContent.Children.Add(CreateBrowseFilters());
+
+        var progress = GetVisibleProgress()
+            .Where(entry => MatchesActiveBrowseFilter(entry.Title))
+            .ToArray();
+        if (progress.Length > 0)
+        {
+            PageContent.Children.Add(CreateSectionHeading("Continue watching", "ON THIS DEVICE"));
+            PageContent.Children.Add(CreateProgressShelf(progress));
+        }
+
+        var saved = GetVisibleSavedTitles()
+            .Where(MatchesActiveBrowseFilter)
+            .ToArray();
+        if (saved.Length > 0)
+        {
+            PageContent.Children.Add(CreateSectionHeading("My List", $"{saved.Length} SAVED LOCALLY"));
+            PageContent.Children.Add(CreateTitleShelf(saved.Take(8).ToArray()));
+        }
+
+        var isUnfilteredHome = _activeGenre is null && _activeFilter == "All";
+        PageContent.Children.Add(CreateSectionHeading(
+            isUnfilteredHome ? "Featured sample titles" : _activeGenre ?? _activeFilter,
+            $"{visible.Count} SAMPLE TITLES"));
+        PageContent.Children.Add(CreateTitleShelf(visible.Take(8).ToArray()));
+
+        if (isUnfilteredHome)
+        {
+            var newTitles = visible.Where(title => title.IsNew).ToArray();
+            if (newTitles.Length > 0)
+            {
+                PageContent.Children.Add(CreateSectionHeading("New in this sample", "FICTIONAL CATALOGUE"));
+                PageContent.Children.Add(CreateTitleShelf(newTitles));
+            }
+
+            var series = visible.Where(title => title.IsSeries).ToArray();
+            if (series.Length > 0)
+            {
+                PageContent.Children.Add(CreateSectionHeading("Series", $"{series.Length} SAMPLE TITLES"));
+                PageContent.Children.Add(CreateTitleShelf(series));
+            }
+
+            var movies = visible.Where(title => !title.IsSeries).ToArray();
+            if (movies.Length > 0)
+            {
+                PageContent.Children.Add(CreateSectionHeading("Movies", $"{movies.Length} SAMPLE TITLES"));
+                PageContent.Children.Add(CreateTitleShelf(movies));
+            }
+        }
     }
 
     private void RenderSearch()
@@ -479,6 +488,9 @@ public sealed partial class MainWindow : Window
         };
     }
 
+    private bool MatchesActiveBrowseFilter(CatalogTitle title) =>
+        ApplyBrowseFilter(new[] { title }).Any();
+
     private IReadOnlyList<CatalogTitle> GetVisibleSavedTitles()
     {
         var visibleById = ApplySourceFilter(_catalog)
@@ -542,18 +554,22 @@ public sealed partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        var selectedPage = _currentPage == "Continue Watching" ? "Continue Watching" : _currentPage;
+        var selectedPage = _currentPage == "Home"
+            ? _activeGenre is null && (_activeFilter is "Movies" or "Series")
+                ? _activeFilter
+                : "Home"
+            : _currentPage;
+
         foreach (var button in NavigationButtons())
         {
             var selected = string.Equals(button.Tag as string, selectedPage, StringComparison.Ordinal);
-            button.Background = selected ? Brush("#202736") : Brush("#00000000");
-            button.Foreground = Brush(selected ? "#F3F5FA" : "#BAC3D1");
+            button.Background = Brush(selected ? "#191919" : "#00000000");
+            button.BorderBrush = Brush(selected ? "#E34855" : "#00000000");
+            button.Foreground = Brush(selected ? "#FFFFFF" : "#B3B3B3");
+            button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
         }
     }
 
     private IEnumerable<Button> NavigationButtons() =>
-        new[] { HomeNav, SearchNav, MyListNav, ContinueNav, HistoryNav, SettingsNav };
-
-    private IEnumerable<TextBlock> NavigationLabels() =>
-        new[] { HomeNavLabel, SearchNavLabel, MyListNavLabel, ContinueNavLabel, HistoryNavLabel, SettingsNavLabel };
+        new[] { HomeNav, SeriesNav, MoviesNav, SearchNav, MyListNav, ContinueNav, HistoryNav, SettingsNav };
 }

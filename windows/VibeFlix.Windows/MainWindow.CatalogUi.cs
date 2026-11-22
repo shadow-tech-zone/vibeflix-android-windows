@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Shapes;
 using Microsoft.UI.Text;
 using VibeFlix.Windows.Models;
@@ -15,10 +16,12 @@ namespace VibeFlix.Windows;
 
 public sealed partial class MainWindow
 {
+    private BitmapImage? _sampleHeroArtwork;
+
     private StackPanel CreatePageHeader(string eyebrow, string title, string description)
     {
         var stack = new StackPanel { Spacing = 6 };
-        stack.Children.Add(CreateText(eyebrow, 10, "#A998EF", FontWeights.SemiBold, characterSpacing: 120));
+        stack.Children.Add(CreateText(eyebrow, 10, "#E34855", FontWeights.SemiBold, characterSpacing: 120));
         stack.Children.Add(CreateText(title, 31, "#F3F5FA", FontWeights.SemiBold, TextWrapping.Wrap));
         stack.Children.Add(CreateText(description, 14, "#A6B0C0", TextWrapping.Wrap));
         return stack;
@@ -26,137 +29,136 @@ public sealed partial class MainWindow
 
     private Border CreatePreviewNotice()
     {
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
-        content.Children.Add(new Border
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 11, VerticalAlignment = VerticalAlignment.Center };
+        content.Children.Add(new Ellipse
         {
-            Width = 9,
-            Height = 9,
-            CornerRadius = new CornerRadius(5),
-            Background = Brush("#A997FF"),
+            Width = 8,
+            Height = 8,
+            Fill = Brush("#E34855"),
             VerticalAlignment = VerticalAlignment.Center
         });
 
         var copy = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
-        copy.Children.Add(CreateText("DESIGN PREVIEW  ·  SAMPLE CATALOGUE", 10, "#C4B9FF", FontWeights.SemiBold, characterSpacing: 80));
-        copy.Children.Add(CreateText("Provider browsing and media playback are not connected. No stream URLs are loaded.", 12, "#A8B3C4", TextWrapping.Wrap));
+        copy.Children.Add(CreateText("SAMPLE CATALOGUE  ·  LOCAL PLAYER", 10, "#F17D84", FontWeights.SemiBold, characterSpacing: 70));
+        copy.Children.Add(CreateText(
+            "Titles and artwork are fictional. Local-file playback is available; no provider streams are connected.",
+            12, "#B3B3B3", TextWrapping.Wrap));
         content.Children.Add(copy);
 
         return new Border
         {
-            Padding = new Thickness(14, 11, 14, 11),
-            CornerRadius = new CornerRadius(12),
-            Background = Brush("#171621"),
-            BorderBrush = Brush("#39334F"),
+            Padding = new Thickness(14, 10, 14, 10),
+            CornerRadius = new CornerRadius(7),
+            Background = Brush("#141414"),
+            BorderBrush = Brush("#2C2C2C"),
             BorderThickness = new Thickness(1),
             Child = content
         };
     }
 
-    private Border CreateHero()
+    private Border CreateHero(CatalogTitle featured)
     {
-        var heroGrid = new Grid();
         var compactHero = PageScrollViewer.ActualWidth < 760;
-        heroGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        if (!compactHero)
+        var heroGrid = new Grid();
+        var hero = new Border
         {
-            heroGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) });
+            Height = compactHero ? 360 : 410,
+            CornerRadius = new CornerRadius(10),
+            BorderBrush = Brush("#303030"),
+            BorderThickness = new Thickness(1),
+            Background = CreateHeroBackground(featured),
+            Child = heroGrid
+        };
+
+        var scrim = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5)
+        };
+        scrim.GradientStops.Add(new GradientStop { Color = ColorFromHex("F5050505"), Offset = 0 });
+        scrim.GradientStops.Add(new GradientStop { Color = ColorFromHex("E8050505"), Offset = 0.47 });
+        scrim.GradientStops.Add(new GradientStop { Color = ColorFromHex("90050505"), Offset = 0.72 });
+        scrim.GradientStops.Add(new GradientStop { Color = ColorFromHex("10050505"), Offset = 1 });
+        heroGrid.Children.Add(new Border { CornerRadius = new CornerRadius(10), Background = scrim });
+
+        var copy = new StackPanel
+        {
+            Margin = new Thickness(compactHero ? 22 : 34, 24, compactHero ? 22 : 30, 24),
+            MaxWidth = compactHero ? 450 : 560,
+            VerticalAlignment = VerticalAlignment.Center,
+            Spacing = compactHero ? 10 : 13
+        };
+        copy.Children.Add(CreateText("VIBEFLIX SAMPLE FEATURE", 10, "#F17D84", FontWeights.SemiBold, characterSpacing: 100));
+        copy.Children.Add(CreateText(featured.Name, compactHero ? 34 : 44, "#FFFFFF", FontWeights.Bold, TextWrapping.Wrap));
+        var format = featured.IsSeries ? $"{featured.Seasons.Count} SEASONS" : $"{featured.RuntimeMinutes} MIN";
+        copy.Children.Add(CreateText(
+            $"{featured.Year}  ·  {featured.Rating}  ·  {format}  ·  {string.Join("  /  ", featured.Genres)}",
+            11, "#E2E2E2", FontWeights.SemiBold, TextWrapping.Wrap));
+        var synopsis = CreateText(featured.Synopsis, 14, "#D0D0D0", TextWrapping.Wrap);
+        synopsis.MaxWidth = 520;
+        synopsis.MaxLines = 3;
+        copy.Children.Add(synopsis);
+        copy.Children.Add(CreateText(
+            "Fictional catalogue entry · choose a local video file from details to play",
+            10, "#B8B8B8", TextWrapping.Wrap));
+
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            Margin = new Thickness(0, 3, 0, 0)
+        };
+        actions.Children.Add(CreateActionButton("More info", () => ShowTitleDetails(featured), isPrimary: true));
+        actions.Children.Add(CreateActionButton("Browse catalogue", () => NavigateTo("Search")));
+        copy.Children.Add(actions);
+        heroGrid.Children.Add(copy);
+        AutomationProperties.SetName(hero, $"Featured sample title: {featured.Name}");
+        return hero;
+    }
+
+    private Microsoft.UI.Xaml.Media.Brush CreateHeroBackground(CatalogTitle featured)
+    {
+        if (featured.Id == "the-glass-orbit" && LoadSampleHeroArtwork() is { } artwork)
+        {
+            return new ImageBrush
+            {
+                ImageSource = artwork,
+                Stretch = Stretch.UniformToFill
+            };
         }
 
-        var background = new LinearGradientBrush
+        var gradient = new LinearGradientBrush
         {
             StartPoint = new Point(0, 0),
             EndPoint = new Point(1, 1)
         };
-        background.GradientStops.Add(new GradientStop { Color = ColorFromHex("17223B"), Offset = 0 });
-        background.GradientStops.Add(new GradientStop { Color = ColorFromHex("22203C"), Offset = 0.55 });
-        background.GradientStops.Add(new GradientStop { Color = ColorFromHex("13202A"), Offset = 1 });
-        heroGrid.Background = background;
-
-        var halo = new Ellipse
-        {
-            Width = 250,
-            Height = 250,
-            Fill = new SolidColorBrush(Color.FromArgb(44, 137, 119, 233)),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 16, 0),
-            IsHitTestVisible = false
-        };
-        heroGrid.Children.Add(halo);
-        var haloInner = new Ellipse
-        {
-            Width = 154,
-            Height = 154,
-            Fill = new SolidColorBrush(Color.FromArgb(48, 76, 202, 177)),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 100, 0),
-            IsHitTestVisible = false
-        };
-        heroGrid.Children.Add(haloInner);
-
-        var copy = new StackPanel
-        {
-            Margin = new Thickness(compactHero ? 22 : 30, 28, compactHero ? 22 : 24, 28),
-            MaxWidth = 650,
-            VerticalAlignment = VerticalAlignment.Center,
-            Spacing = 14
-        };
-        copy.Children.Add(CreateText("DISCOVER AT YOUR OWN PACE", 10, "#C6B9FF", FontWeights.SemiBold, characterSpacing: 100));
-        copy.Children.Add(CreateText("Stories, sorted your way.", 34, "#FFFFFF", FontWeights.Bold, TextWrapping.Wrap));
-        copy.Children.Add(CreateText(
-            "A fresh desktop library for exploring sources, saving favourites, and finding your next watch.",
-            14, "#C5CCDA", TextWrapping.Wrap));
-
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 2, 0, 0) };
-        actions.Children.Add(CreateActionButton("Browse catalogue", () => NavigateTo("Search"), isPrimary: true));
-        actions.Children.Add(CreateActionButton("Open My List", () => NavigateTo("My List")));
-        copy.Children.Add(actions);
-        heroGrid.Children.Add(copy);
-
-        var sideNote = new StackPanel
-        {
-            Margin = new Thickness(0, 28, 26, 28),
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Spacing = 10
-        };
-        sideNote.Children.Add(CreateMiniMetric("01", "CHOOSE A SOURCE", "Server 1, Server 2, or both"));
-        sideNote.Children.Add(CreateMiniMetric("02", "KEEP YOUR PLACE", "Local list and resume flows"));
-        sideNote.Children.Add(CreateMiniMetric("03", "BUILT FOR WINDOWS", "Keyboard, mouse, and resizing"));
-        if (!compactHero)
-        {
-            Grid.SetColumn(sideNote, 1);
-            heroGrid.Children.Add(sideNote);
-        }
-
-        return new Border
-        {
-            Height = 280,
-            CornerRadius = new CornerRadius(18),
-            BorderBrush = Brush("#344158"),
-            BorderThickness = new Thickness(1),
-            Child = heroGrid
-        };
+        gradient.GradientStops.Add(new GradientStop { Color = ColorFromHex(featured.AccentStart), Offset = 0 });
+        gradient.GradientStops.Add(new GradientStop { Color = ColorFromHex(featured.AccentEnd), Offset = 1 });
+        return gradient;
     }
 
-    private Border CreateMiniMetric(string number, string title, string subtitle)
+    private BitmapImage? LoadSampleHeroArtwork()
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        row.Children.Add(CreateText(number, 15, "#B4A4FF", FontWeights.SemiBold));
-        var copy = new StackPanel { Spacing = 2 };
-        copy.Children.Add(CreateText(title, 9, "#D4D9E3", FontWeights.SemiBold, characterSpacing: 55));
-        copy.Children.Add(CreateText(subtitle, 11, "#A7B1C1", TextWrapping.Wrap));
-        row.Children.Add(copy);
-        return new Border
+        if (_sampleHeroArtwork is not null)
         {
-            Padding = new Thickness(11, 9, 11, 9),
-            CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.FromArgb(78, 13, 18, 31)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(75, 189, 197, 218)),
-            BorderThickness = new Thickness(1),
-            Child = row
-        };
+            return _sampleHeroArtwork;
+        }
+
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "glass-orbit-hero.png");
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            _sampleHeroArtwork = new BitmapImage(new Uri(path, UriKind.Absolute));
+            return _sampleHeroArtwork;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private StackPanel CreateBrowseFilters()
@@ -243,10 +245,10 @@ public sealed partial class MainWindow
         {
             Content = label,
             Padding = new Thickness(15, 8, 15, 8),
-            Background = Brush(selected ? "#D8CEFF" : "#151B25"),
-            BorderBrush = Brush(selected ? "#D8CEFF" : "#303A49"),
+            Background = Brush(selected ? "#E34855" : "#171717"),
+            BorderBrush = Brush(selected ? "#E34855" : "#3A3A3A"),
             BorderThickness = new Thickness(1),
-            Foreground = Brush(selected ? "#151326" : "#D5DAE3"),
+            Foreground = Brush(selected ? "#FFFFFF" : "#D0D0D0"),
             FontSize = 12,
             FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
             VerticalAlignment = VerticalAlignment.Center
@@ -277,8 +279,8 @@ public sealed partial class MainWindow
         {
             Padding = new Thickness(16, 13, 16, 13),
             CornerRadius = new CornerRadius(12),
-            Background = Brush("#111721"),
-            BorderBrush = Brush("#293240"),
+            Background = Brush("#141414"),
+            BorderBrush = Brush("#2C2C2C"),
             BorderThickness = new Thickness(1),
             Child = copy
         };
@@ -287,7 +289,7 @@ public sealed partial class MainWindow
     private Border CreateEmptyState(string title, string description, string actionLabel, Action action)
     {
         var content = new StackPanel { Spacing = 12, MaxWidth = 560 };
-        content.Children.Add(CreateText("YOUR LIBRARY, YOUR PACE", 9, "#A998EF", FontWeights.SemiBold, characterSpacing: 90));
+        content.Children.Add(CreateText("YOUR LIBRARY, YOUR PACE", 9, "#E34855", FontWeights.SemiBold, characterSpacing: 90));
         content.Children.Add(CreateText(title, 21, "#F1F3F7", FontWeights.SemiBold, TextWrapping.Wrap));
         content.Children.Add(CreateText(description, 13, "#9CA7B8", TextWrapping.Wrap));
         content.Children.Add(CreateActionButton(actionLabel, action, isPrimary: true));
@@ -295,8 +297,8 @@ public sealed partial class MainWindow
         {
             Padding = new Thickness(24),
             CornerRadius = new CornerRadius(15),
-            Background = Brush("#121822"),
-            BorderBrush = Brush("#2A3443"),
+            Background = Brush("#141414"),
+            BorderBrush = Brush("#2C2C2C"),
             BorderThickness = new Thickness(1),
             Child = content
         };
@@ -338,10 +340,11 @@ public sealed partial class MainWindow
         {
             row.Children.Add(CreateTitleCard(
                 entry.Title,
-                178,
+                246,
                 entry.Progress,
                 "Remove resume marker",
-                () => RemoveProgress(entry.Title, entry.Progress)));
+                () => RemoveProgress(entry.Title, entry.Progress),
+                landscape: true));
         }
 
         scroller.Content = row;
@@ -378,7 +381,7 @@ public sealed partial class MainWindow
         var viewportWidth = PageScrollViewer.ActualWidth;
         if (viewportWidth < 300)
         {
-            viewportWidth = Math.Max(640, AppRoot.ActualWidth - NavigationColumn.Width.Value - 70);
+            viewportWidth = Math.Max(640, AppRoot.ActualWidth - 70);
         }
 
         var availableWidth = Math.Max(330, viewportWidth - 70);
@@ -426,9 +429,10 @@ public sealed partial class MainWindow
         double width,
         ProgressEntry? progress = null,
         string? extraActionLabel = null,
-        Action? extraAction = null)
+        Action? extraAction = null,
+        bool landscape = false)
     {
-        var posterHeight = width * 1.26;
+        var posterHeight = width * (landscape ? 0.56 : 1.26);
         var card = new StackPanel { Width = width, Spacing = 8 };
         var posterButton = new Button
         {
@@ -439,7 +443,30 @@ public sealed partial class MainWindow
             Background = Brush("#00000000"),
             BorderThickness = new Thickness(0),
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            VerticalContentAlignment = VerticalAlignment.Stretch
+            VerticalContentAlignment = VerticalAlignment.Stretch,
+            RenderTransformOrigin = new Point(0.5, 0.5)
+        };
+        var hoverScale = new ScaleTransform();
+        posterButton.RenderTransform = hoverScale;
+        posterButton.PointerEntered += (_, _) =>
+        {
+            hoverScale.ScaleX = 1.035;
+            hoverScale.ScaleY = 1.035;
+        };
+        posterButton.PointerExited += (_, _) =>
+        {
+            hoverScale.ScaleX = 1;
+            hoverScale.ScaleY = 1;
+        };
+        posterButton.GotFocus += (_, _) =>
+        {
+            hoverScale.ScaleX = 1.035;
+            hoverScale.ScaleY = 1.035;
+        };
+        posterButton.LostFocus += (_, _) =>
+        {
+            hoverScale.ScaleX = 1;
+            hoverScale.ScaleY = 1;
         };
         AutomationProperties.SetName(posterButton, $"Open details for {title.Name}");
         AutomationProperties.SetHelpText(posterButton, title.Synopsis);
@@ -471,8 +498,8 @@ public sealed partial class MainWindow
                 Maximum = 100,
                 Value = progress.Percent,
                 Height = 5,
-                Foreground = Brush("#A997FF"),
-                Background = Brush("#293241")
+                Foreground = Brush("#E34855"),
+                Background = Brush("#343434")
             };
             card.Children.Add(progressBar);
             card.Children.Add(CreateText(FormatProgressLabel(title, progress), 10, "#AEB8C8", TextWrapping.Wrap));
@@ -578,8 +605,8 @@ public sealed partial class MainWindow
         return new Border
         {
             Height = height,
-            CornerRadius = new CornerRadius(14),
-            BorderBrush = Brush("#475164"),
+            CornerRadius = new CornerRadius(8),
+            BorderBrush = Brush("#3A3A3A"),
             BorderThickness = new Thickness(1),
             Child = grid
         };
@@ -593,10 +620,10 @@ public sealed partial class MainWindow
             Width = 32,
             Height = 32,
             Padding = new Thickness(0),
-            Background = Brush("#1A202B"),
-            BorderBrush = Brush("#354052"),
+            Background = Brush("#1A1A1A"),
+            BorderBrush = Brush("#4A4A4A"),
             BorderThickness = new Thickness(1),
-            Foreground = Brush("#DED6FF"),
+            Foreground = Brush("#F17D84"),
             FontSize = 16,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
@@ -612,10 +639,10 @@ public sealed partial class MainWindow
         {
             Content = label,
             Padding = new Thickness(15, 9, 15, 9),
-            Background = Brush(isPrimary ? "#9E87F2" : "#1B222E"),
-            BorderBrush = Brush(isPrimary ? "#9E87F2" : "#394456"),
+            Background = Brush(isPrimary ? "#E34855" : "#242424"),
+            BorderBrush = Brush(isPrimary ? "#E34855" : "#3A3A3A"),
             BorderThickness = new Thickness(1),
-            Foreground = Brush(isPrimary ? "#171322" : "#E3E7EE"),
+            Foreground = Brush("#FFFFFF"),
             FontSize = 12,
             FontWeight = isPrimary ? FontWeights.SemiBold : FontWeights.Normal,
             HorizontalAlignment = HorizontalAlignment.Left
@@ -634,8 +661,8 @@ public sealed partial class MainWindow
         {
             Padding = new Thickness(20),
             CornerRadius = new CornerRadius(14),
-            Background = Brush("#121822"),
-            BorderBrush = Brush("#2A3442"),
+            Background = Brush("#141414"),
+            BorderBrush = Brush("#2C2C2C"),
             BorderThickness = new Thickness(1),
             Child = content
         };
