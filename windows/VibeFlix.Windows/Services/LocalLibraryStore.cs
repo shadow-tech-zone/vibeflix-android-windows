@@ -3,8 +3,8 @@ using System.Text.Json;
 namespace VibeFlix.Windows.Services;
 
 /// <summary>
-/// Small local-only store for the Windows UI milestone. It holds library identifiers and
-/// user-created preview state only; no provider credentials, stream URLs, or cloud sync.
+/// Local-only Windows library store. It holds library identifiers and playback positions, but
+/// never persists media paths, provider credentials, stream URLs, or cloud-synced data.
 /// </summary>
 public sealed class LocalLibraryStore
 {
@@ -15,10 +15,16 @@ public sealed class LocalLibraryStore
     private LibraryState _state;
 
     public LocalLibraryStore()
-    {
-        _directory = Path.Combine(
+        : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "VibeFlix");
+            "VibeFlix"))
+    {
+    }
+
+    internal LocalLibraryStore(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        _directory = directory;
         _filePath = Path.Combine(_directory, "library.json");
         _state = ReadState();
     }
@@ -53,7 +59,22 @@ public sealed class LocalLibraryStore
     {
         lock (_gate)
         {
-            return _state.Progress.OrderByDescending(entry => entry.UpdatedAt).ToArray();
+            return _state.Progress
+                .OrderByDescending(entry => entry.UpdatedAt)
+                .Select(CloneProgress)
+                .ToArray();
+        }
+    }
+
+    public ProgressEntry? GetProgress(string titleId, string? episodeKey)
+    {
+        var normalizedEpisodeKey = episodeKey ?? string.Empty;
+        lock (_gate)
+        {
+            var entry = _state.Progress.FirstOrDefault(progress =>
+                string.Equals(progress.TitleId, titleId, StringComparison.Ordinal)
+                && string.Equals(progress.EpisodeKey, normalizedEpisodeKey, StringComparison.Ordinal));
+            return entry is null ? null : CloneProgress(entry);
         }
     }
 
@@ -82,21 +103,58 @@ public sealed class LocalLibraryStore
     }
 
     /// <summary>
-    /// Writes an explicitly labelled sample progress marker to exercise the resume UI.
-    /// It does not represent media playback and must not be reported as real watch progress.
+    /// Persists real local-file playback progress by title and episode. The media file path is
+    /// deliberately not stored; the user chooses the file again when resuming on this device.
     /// </summary>
-    public void AddPreviewProgress(string titleId, int percent)
+    public void SavePlaybackProgress(
+        string titleId,
+        string? episodeKey,
+        long positionMilliseconds,
+        long durationMilliseconds,
+        bool titleCompleted)
     {
+        var normalizedEpisodeKey = episodeKey ?? string.Empty;
+        var position = Math.Max(0, positionMilliseconds);
+        var duration = Math.Max(0, durationMilliseconds);
+        var percent = duration == 0
+            ? 0
+            : (int)Math.Clamp(Math.Round(position * 100d / duration), 0d, 100d);
+        var completed = duration > 0 && position / (double)duration >= 0.95;
+
         lock (_gate)
         {
-            _state.Progress.RemoveAll(entry => string.Equals(entry.TitleId, titleId, StringComparison.Ordinal));
-            _state.Progress.Insert(0, new ProgressEntry
+            _state.Progress.RemoveAll(entry =>
+                string.Equals(entry.TitleId, titleId, StringComparison.Ordinal)
+                && (entry.IsPreviewMarker
+                    || string.Equals(entry.EpisodeKey, normalizedEpisodeKey, StringComparison.Ordinal)));
+
+            if (completed)
             {
-                TitleId = titleId,
-                Percent = Math.Clamp(percent, 1, 94),
-                UpdatedAt = DateTimeOffset.UtcNow,
-                IsPreviewMarker = true
-            });
+                if (titleCompleted)
+                {
+                    _state.Progress.RemoveAll(entry => string.Equals(entry.TitleId, titleId, StringComparison.Ordinal));
+                    _state.History.RemoveAll(entry => string.Equals(entry.TitleId, titleId, StringComparison.Ordinal));
+                    _state.History.Insert(0, new HistoryEntry
+                    {
+                        TitleId = titleId,
+                        WatchedAt = DateTimeOffset.UtcNow
+                    });
+                }
+            }
+            else if (position > 0)
+            {
+                _state.Progress.Insert(0, new ProgressEntry
+                {
+                    TitleId = titleId,
+                    EpisodeKey = normalizedEpisodeKey,
+                    PositionMilliseconds = position,
+                    DurationMilliseconds = duration,
+                    Percent = percent,
+                    UpdatedAt = DateTimeOffset.UtcNow,
+                    IsPreviewMarker = false
+                });
+            }
+
             SaveState();
         }
     }
@@ -106,6 +164,18 @@ public sealed class LocalLibraryStore
         lock (_gate)
         {
             _state.Progress.RemoveAll(entry => string.Equals(entry.TitleId, titleId, StringComparison.Ordinal));
+            SaveState();
+        }
+    }
+
+    public void RemoveFromContinueWatching(string titleId, string? episodeKey)
+    {
+        var normalizedEpisodeKey = episodeKey ?? string.Empty;
+        lock (_gate)
+        {
+            _state.Progress.RemoveAll(entry =>
+                string.Equals(entry.TitleId, titleId, StringComparison.Ordinal)
+                && string.Equals(entry.EpisodeKey, normalizedEpisodeKey, StringComparison.Ordinal));
             SaveState();
         }
     }
@@ -151,6 +221,11 @@ public sealed class LocalLibraryStore
             state.MyList ??= [];
             state.History ??= [];
             state.Progress ??= [];
+            foreach (var progress in state.Progress)
+            {
+                progress.EpisodeKey ??= string.Empty;
+            }
+
             return state;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
@@ -159,6 +234,17 @@ public sealed class LocalLibraryStore
             return new LibraryState();
         }
     }
+
+    private static ProgressEntry CloneProgress(ProgressEntry entry) => new()
+    {
+        TitleId = entry.TitleId,
+        EpisodeKey = entry.EpisodeKey,
+        PositionMilliseconds = entry.PositionMilliseconds,
+        DurationMilliseconds = entry.DurationMilliseconds,
+        Percent = entry.Percent,
+        UpdatedAt = entry.UpdatedAt,
+        IsPreviewMarker = entry.IsPreviewMarker
+    };
 
     private void SaveState()
     {
@@ -187,6 +273,9 @@ public sealed class HistoryEntry
 public sealed class ProgressEntry
 {
     public string TitleId { get; set; } = string.Empty;
+    public string EpisodeKey { get; set; } = string.Empty;
+    public long PositionMilliseconds { get; set; }
+    public long DurationMilliseconds { get; set; }
     public int Percent { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public bool IsPreviewMarker { get; set; }

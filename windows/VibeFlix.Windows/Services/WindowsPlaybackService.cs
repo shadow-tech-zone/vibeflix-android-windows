@@ -1,11 +1,12 @@
 using Windows.Media.Core;
 using Windows.Media.Playback;
+using Windows.Storage;
 
 namespace VibeFlix.Windows.Services;
 
 /// <summary>
-/// Owns the Windows-native playback engine. Provider-specific catalog and stream resolution
-/// will be added separately; Android Media3 code is deliberately not shared with this client.
+/// Owns the Windows-native playback engine for user-selected local files. Provider-specific
+/// catalogue and stream resolution are deliberately outside this local playback milestone.
 /// </summary>
 public sealed class WindowsPlaybackService : IDisposable
 {
@@ -13,30 +14,47 @@ public sealed class WindowsPlaybackService : IDisposable
 
     public WindowsPlaybackService()
     {
-        Player = new MediaPlayer();
+        Player = new MediaPlayer
+        {
+            AutoPlay = false
+        };
     }
 
     /// <summary>
-    /// The native player can be hosted by a WinUI MediaPlayerElement when playback UI is added.
+    /// The native player is hosted by a WinUI MediaPlayerElement in the Windows playback view.
     /// </summary>
     public MediaPlayer Player { get; }
 
-    /// <summary>
-    /// Loads a resolved HTTP(S) media URI. Catalog/page URLs and provider credentials do not
-    /// belong here; a future resolver must supply a validated, playable media URI.
-    /// </summary>
-    public void Load(Uri mediaUri)
+    public MediaPlaybackItem CreateLocalPlaybackItem(StorageFile file)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentNullException.ThrowIfNull(mediaUri);
+        ArgumentNullException.ThrowIfNull(file);
+        return new MediaPlaybackItem(MediaSource.CreateFromStorageFile(file));
+    }
 
-        if (!mediaUri.IsAbsoluteUri ||
-            (mediaUri.Scheme != Uri.UriSchemeHttp && mediaUri.Scheme != Uri.UriSchemeHttps))
+    public void Load(MediaPlaybackItem playbackItem)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(playbackItem);
+        Player.Source = playbackItem;
+    }
+
+    public void SeekTo(TimeSpan position)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (position < TimeSpan.Zero)
         {
-            throw new ArgumentException("Only absolute HTTP or HTTPS media URIs are supported.", nameof(mediaUri));
+            throw new ArgumentOutOfRangeException(nameof(position));
         }
 
-        Player.Source = MediaSource.CreateFromUri(mediaUri);
+        Player.PlaybackSession.Position = position;
+    }
+
+    public void ClearSource()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        Player.Pause();
+        Player.Source = null;
     }
 
     public void Play()
@@ -58,7 +76,7 @@ public sealed class WindowsPlaybackService : IDisposable
             return;
         }
 
-        Player.Dispose();
         _disposed = true;
+        Player.Dispose();
     }
 }

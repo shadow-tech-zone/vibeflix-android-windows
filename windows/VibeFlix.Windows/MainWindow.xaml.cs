@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
+using Windows.Storage;
 using Windows.System;
 
 namespace VibeFlix.Windows;
@@ -10,6 +11,8 @@ namespace VibeFlix.Windows;
 public sealed partial class MainWindow : Window
 {
     private readonly LocalLibraryStore _library = new();
+    private readonly WindowsPlaybackService _playback = new();
+    private readonly Dictionary<string, StorageFile> _sessionMediaFiles = new(StringComparer.Ordinal);
     private readonly IReadOnlyList<CatalogTitle> _catalog = DemoCatalog.Titles;
     private string _currentPage = "Home";
     private string _activeFilter = "All";
@@ -18,11 +21,28 @@ public sealed partial class MainWindow : Window
     private bool _compactNavigation;
     private bool _rendering;
     private double _lastContentWidth = -1;
+    private Action? _flushPlaybackOnClose;
+    private bool _windowClosed;
 
     public MainWindow()
     {
         InitializeComponent();
         Title = "VibeFlix";
+        Closed += (_, _) =>
+        {
+            _windowClosed = true;
+            var flushPlayback = _flushPlaybackOnClose;
+            _flushPlaybackOnClose = null;
+            try
+            {
+                flushPlayback?.Invoke();
+            }
+            finally
+            {
+                _sessionMediaFiles.Clear();
+                _playback.Dispose();
+            }
+        };
         ServerPicker.SelectedIndex = 0;
         RenderCurrentPage(resetScroll: true);
     }
@@ -226,7 +246,7 @@ public sealed partial class MainWindow : Window
         {
             PageContent.Children.Add(CreateCompactEmptyState(
                 "Continue watching",
-                "Your resume list is clear. When a real player is connected, local progress will appear here. The title preview can add a clearly marked sample progress marker for layout testing."));
+                "Your resume list is clear. Choose a local video file from a title's player view; real positions are saved per episode and never uploaded."));
         }
 
         var saved = GetVisibleSavedTitles();
@@ -328,14 +348,14 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "YOUR LIBRARY  /  RESUME",
             "Continue watching",
-            "Resume markers are stored on this device. Sample markers are clearly identified as preview data."));
+            "Playback positions are stored per episode on this device. Media files are not copied, uploaded, or remembered after the app closes."));
         PageContent.Children.Add(CreatePreviewNotice());
 
         if (progress.Count == 0)
         {
             PageContent.Children.Add(CreateEmptyState(
                 "Nothing to resume yet.",
-                "Real progress will appear after the Windows player is connected. Open a title and add a sample marker to explore this view.",
+                "Choose a local video from a title's player view. When you resume, select the same file again; its path is never stored.",
                 "Browse titles",
                 () => NavigateTo("Home")));
             return;
@@ -351,14 +371,14 @@ public sealed partial class MainWindow : Window
         PageContent.Children.Add(CreatePageHeader(
             "YOUR LIBRARY  /  RECENT",
             "History",
-            "A local record of titles you marked as watched in this preview."));
+            "Movies and final episodes completed in local playback, plus titles you marked watched manually, appear here."));
         PageContent.Children.Add(CreatePreviewNotice());
 
         if (history.Count == 0)
         {
             PageContent.Children.Add(CreateEmptyState(
                 "Your history is empty.",
-                "Mark a sample title as watched from its detail view to see how history is organized.",
+                "Complete a local movie or series finale, or mark a title watched manually from its details.",
                 "Browse titles",
                 () => NavigateTo("Home")));
             return;
@@ -385,7 +405,7 @@ public sealed partial class MainWindow : Window
 
         var localCard = CreateSettingsCard(
             "Local library",
-            "My List, History, and preview resume markers are stored on this device. Stream addresses and provider credentials are not saved in the library.",
+            "My List, History, and per-episode playback positions are stored on this device. Media file paths, stream addresses, and provider credentials are not saved.",
             out var localCardContent);
         localCardContent.Children.Add(CreateSettingsDetail("Storage file", _library.StorageLocation));
         var localActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 12, 0, 0) };
@@ -396,10 +416,10 @@ public sealed partial class MainWindow : Window
 
         var integrationCard = CreateSettingsCard(
             "Connections",
-            "The Server 1 / Server 2 selector currently filters fictional preview entries. Provider catalogue browsing and stream resolution are not connected.",
+            "Server 1 / Server 2 currently filter fictional catalogue entries. Playback is limited to local files you select; provider catalogue browsing and stream resolution are not connected.",
             out var integrationCardContent);
         integrationCardContent.Children.Add(CreateStatusLine("Catalogue providers", "Not connected", "#DDBB85"));
-        integrationCardContent.Children.Add(CreateStatusLine("Windows playback", "Not connected", "#DDBB85"));
+        integrationCardContent.Children.Add(CreateStatusLine("Local file playback", "Available", "#A8D8BD"));
         integrationCardContent.Children.Add(CreateStatusLine("Account and cloud sync", "Not connected", "#AEB8C8"));
         integrationCardContent.Children.Add(CreateText(
             "Signing in will not upload or sync anything in this build. The existing local-first, explicit-consent boundary remains unchanged.",

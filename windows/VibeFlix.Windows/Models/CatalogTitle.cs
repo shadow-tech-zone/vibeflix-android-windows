@@ -66,12 +66,11 @@ public sealed record MediaSeason(int Number, IReadOnlyList<MediaEpisode> Episode
 }
 
 /// <summary>
-/// Episode metadata for navigation and layout previews. CaptionPreview is fictional sample
-/// text only; it is never treated as a timed subtitle track.
+/// Episode metadata for local-file playback navigation. Media files and timed-text tracks are
+/// selected by the user at playback time and are not part of this fictional catalogue record.
 /// </summary>
 public sealed record MediaEpisode(
     int Number,
     string Name,
     string Synopsis,
-    int RuntimeMinutes,
-    string? CaptionPreview = null);
+    int RuntimeMinutes);

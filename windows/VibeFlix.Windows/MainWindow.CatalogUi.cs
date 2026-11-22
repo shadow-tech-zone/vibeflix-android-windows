@@ -341,7 +341,7 @@ public sealed partial class MainWindow
                 178,
                 entry.Progress,
                 "Remove resume marker",
-                () => RemoveProgress(entry.Title)));
+                () => RemoveProgress(entry.Title, entry.Progress)));
         }
 
         scroller.Content = row;
@@ -361,7 +361,7 @@ public sealed partial class MainWindow
             width,
             progress[index].Progress,
             "Remove resume marker",
-            () => RemoveProgress(progress[index].Title)));
+            () => RemoveProgress(progress[index].Title, progress[index].Progress)));
     }
 
     private Grid CreateResponsiveHistoryGrid(IReadOnlyList<(HistoryEntry History, CatalogTitle Title)> history)
@@ -475,10 +475,8 @@ public sealed partial class MainWindow
                 Background = Brush("#293241")
             };
             card.Children.Add(progressBar);
-            card.Children.Add(CreateText(
-                progress.IsPreviewMarker ? $"Sample resume marker  ·  {progress.Percent}%" : $"Resume  ·  {progress.Percent}%",
-                10, "#AEB8C8", TextWrapping.Wrap));
-            var resumeButton = CreateActionButton("Open player preview", () => ShowTitleDetails(title));
+            card.Children.Add(CreateText(FormatProgressLabel(title, progress), 10, "#AEB8C8", TextWrapping.Wrap));
+            var resumeButton = CreateActionButton("Resume local playback", () => ResumeLocalPlayback(title, progress));
             card.Children.Add(resumeButton);
         }
 
@@ -490,6 +488,29 @@ public sealed partial class MainWindow
         }
 
         return card;
+    }
+
+    private static string FormatProgressLabel(CatalogTitle title, ProgressEntry progress)
+    {
+        if (progress.IsPreviewMarker)
+        {
+            return $"Sample resume marker  ·  {progress.Percent}%";
+        }
+
+        foreach (var season in title.Seasons)
+        {
+            var episode = season.Episodes.FirstOrDefault(candidate =>
+                string.Equals(
+                    progress.EpisodeKey,
+                    $"S{season.Number:00}E{candidate.Number:00}",
+                    StringComparison.Ordinal));
+            if (episode is not null)
+            {
+                return $"Resume  ·  S{season.Number:00} E{episode.Number:00}  ·  {episode.Name}  ·  {progress.Percent}%";
+            }
+        }
+
+        return $"Resume  ·  {progress.Percent}%";
     }
 
     private Border CreatePoster(CatalogTitle title, double height)
@@ -715,11 +736,11 @@ public sealed partial class MainWindow
         }
     }
 
-    private void RemoveProgress(CatalogTitle title)
+    private void RemoveProgress(CatalogTitle title, ProgressEntry progress)
     {
         try
         {
-            _library.RemoveFromContinueWatching(title.Id);
+            _library.RemoveFromContinueWatching(title.Id, progress.EpisodeKey);
             RenderCurrentPage(resetScroll: false);
         }
         catch (IOException)

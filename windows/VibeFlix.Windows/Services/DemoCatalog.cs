@@ -38,14 +38,14 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "A Signal in the Dark", 46, "An observatory receives an impossible transmission.", "The signal is repeating our last message."),
-                    Episode(2, "The Empty Coordinates", 43, "A second set of coordinates points to an empty region of space.", "Those coordinates are not in any star chart."),
-                    Episode(3, "A Map of Quiet", 49, "Mira finds a map encoded in the radio telescope's static.", "Listen between the pulses, not after them."),
-                    Episode(4, "The Other Side", 45, "The team discovers a familiar voice hidden in the recording.", "If you can hear this, keep the station dark.")),
+                    Episode(1, "A Signal in the Dark", 46, "An observatory receives an impossible transmission."),
+                    Episode(2, "The Empty Coordinates", 43, "A second set of coordinates points to an empty region of space."),
+                    Episode(3, "A Map of Quiet", 49, "Mira finds a map encoded in the radio telescope's static."),
+                    Episode(4, "The Other Side", 45, "The team discovers a familiar voice hidden in the recording.")),
                 Season(2,
-                    Episode(1, "Return Window", 48, "A new signal arrives on the anniversary of the first one.", "The window is open for only eleven minutes."),
-                    Episode(2, "The Long Frequency", 51, "A patient experiment reveals a pattern in the silence.", "We have been answering it for years."),
-                    Episode(3, "Pale Blue Light", 44, "The crew sees a new point of light beyond the lunar horizon.", "That light was not there yesterday."))
+                    Episode(1, "Return Window", 48, "A new signal arrives on the anniversary of the first one."),
+                    Episode(2, "The Long Frequency", 51, "A patient experiment reveals a pattern in the silence."),
+                    Episode(3, "Pale Blue Light", 44, "The crew sees a new point of light beyond the lunar horizon."))
             ]),
         new CatalogTitle(
             Id: "river-of-maps",
@@ -76,9 +76,9 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "First Batch", 28, "The new baker meets the regulars before sunrise.", "There is always room for one more at this table."),
-                    Episode(2, "The Lost Recipe", 31, "A flour-dusted notebook sends the neighbours looking for its author.", "It is written in the margins, not the ingredients."),
-                    Episode(3, "After Closing", 27, "A late customer leaves behind a very familiar umbrella.", "We can solve this before the first bus."))
+                    Episode(1, "First Batch", 28, "The new baker meets the regulars before sunrise."),
+                    Episode(2, "The Lost Recipe", 31, "A flour-dusted notebook sends the neighbours looking for its author."),
+                    Episode(3, "After Closing", 27, "A late customer leaves behind a very familiar umbrella."))
             ]),
         new CatalogTitle(
             Id: "blue-hour-fieldnotes",
@@ -110,9 +110,9 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "The Measured Room", 50, "A careful survey reveals an extra step in the old house.", "The blueprint says this wall is three feet shorter."),
-                    Episode(2, "Dust Lines", 53, "Fresh footprints appear in a room sealed for decades.", "Someone has been here since we locked the door."),
-                    Episode(3, "A Door Below", 49, "A familiar tune leads the conservator beneath the stairs.", "Wait here. I know this song."))
+                    Episode(1, "The Measured Room", 50, "A careful survey reveals an extra step in the old house."),
+                    Episode(2, "Dust Lines", 53, "Fresh footprints appear in a room sealed for decades."),
+                    Episode(3, "A Door Below", 49, "A familiar tune leads the conservator beneath the stairs."))
             ]),
         new CatalogTitle(
             Id: "paper-comets",
@@ -144,9 +144,9 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "The First Dedication", 37, "A shy caller asks the station to play a song for a stranger.", "Somebody out there still remembers the old chorus."),
-                    Episode(2, "Static at Noon", 41, "A burst of static repeats a voice from the greenhouse archive.", "Turn the dial slowly. There is a voice underneath."),
-                    Episode(3, "The Conservatory Key", 36, "The station's newest volunteer finds a key taped under a desk.", "I think this belongs to the room with all the ferns."))
+                    Episode(1, "The First Dedication", 37, "A shy caller asks the station to play a song for a stranger."),
+                    Episode(2, "Static at Noon", 41, "A burst of static repeats a voice from the greenhouse archive."),
+                    Episode(3, "The Conservatory Key", 36, "The station's newest volunteer finds a key taped under a desk."))
             ]),
         new CatalogTitle(
             Id: "salt-and-saffron-skies",
@@ -179,9 +179,9 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "Soft Reset", 43, "A donated robot remembers the street before its last renovation.", "Please do not reset me. I know where the old well is."),
-                    Episode(2, "Battery Weather", 46, "A strange weather log leads the crew to a missing sensor.", "It rained here before the clouds arrived."),
-                    Episode(3, "The Parts Drawer", 45, "The youngest mechanic recognizes a name etched inside a circuit board.", "My grandmother made this mark."))
+                    Episode(1, "Soft Reset", 43, "A donated robot remembers the street before its last renovation."),
+                    Episode(2, "Battery Weather", 46, "A strange weather log leads the crew to a missing sensor."),
+                    Episode(3, "The Parts Drawer", 45, "The youngest mechanic recognizes a name etched inside a circuit board."))
             ]),
         new CatalogTitle(
             Id: "the-last-tea-room",
@@ -212,9 +212,9 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "A Room Above", 26, "The librarian opens the building's forgotten rooftop room.", "We could make a shelf for every neighbour."),
-                    Episode(2, "The Borrowed Kite", 24, "A kite catches on the roof just as the reading club begins.", "One good idea can travel a long way."),
-                    Episode(3, "A Shelf for Everyone", 27, "The children build a lending shelf for the whole block.", "This shelf belongs to everyone who needs a story."))
+                    Episode(1, "A Room Above", 26, "The librarian opens the building's forgotten rooftop room."),
+                    Episode(2, "The Borrowed Kite", 24, "A kite catches on the roof just as the reading club begins."),
+                    Episode(3, "A Shelf for Everyone", 27, "The children build a lending shelf for the whole block."))
             ]),
         new CatalogTitle(
             Id: "the-patient-comet",
@@ -245,9 +245,9 @@ internal static class DemoCatalog
             Seasons:
             [
                 Season(1,
-                    Episode(1, "Inside Cover", 40, "A note in a returned book points to a stall that disappeared years ago.", "The note is addressed to someone who still works here."),
-                    Episode(2, "Margin Notes", 42, "Two readers remember the same afternoon very differently.", "There was another sentence in the margin."),
-                    Episode(3, "The Missing Name", 43, "The bookseller finds a familiar name missing from every record.", "I promised I would never let the name disappear."))
+                    Episode(1, "Inside Cover", 40, "A note in a returned book points to a stall that disappeared years ago."),
+                    Episode(2, "Margin Notes", 42, "Two readers remember the same afternoon very differently."),
+                    Episode(3, "The Missing Name", 43, "The bookseller finds a familiar name missing from every record."))
             ]),
         new CatalogTitle(
             Id: "lantern-assembly",
@@ -285,7 +285,6 @@ internal static class DemoCatalog
         int number,
         string name,
         int runtimeMinutes,
-        string synopsis,
-        string captionPreview) =>
-        new(number, name, synopsis, runtimeMinutes, captionPreview);
+        string synopsis) =>
+        new(number, name, synopsis, runtimeMinutes);
 }
