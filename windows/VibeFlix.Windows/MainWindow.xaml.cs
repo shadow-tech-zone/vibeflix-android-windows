@@ -1,11 +1,11 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Input;
 using VibeFlix.Windows.Models;
 using VibeFlix.Windows.Services;
 using Windows.Storage;
 using Windows.System;
-using Windows.UI.Text;
 
 namespace VibeFlix.Windows;
 

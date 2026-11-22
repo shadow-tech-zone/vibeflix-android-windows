@@ -144,7 +144,7 @@ public sealed partial class MainWindow
             return _sampleHeroArtwork;
         }
 
-        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "glass-orbit-hero.png");
+        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "glass-orbit-hero.png");
         if (!File.Exists(path))
         {
             return null;
@@ -152,7 +152,8 @@ public sealed partial class MainWindow
 
         try
         {
-            _sampleHeroArtwork = new BitmapImage(new Uri(path, UriKind.Absolute));
+            var fileUri = new System.Uri(path, System.UriKind.Absolute);
+            _sampleHeroArtwork = new BitmapImage(new Windows.Foundation.Uri(fileUri.AbsoluteUri));
             return _sampleHeroArtwork;
         }
         catch (Exception)
