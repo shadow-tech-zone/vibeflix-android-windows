@@ -756,10 +756,10 @@ public sealed partial class MainWindow : Window
             _server2Unavailable ? "Unavailable" : "Connected",
             _server2Unavailable ? "#E3A77B" : "#A8D8BD"));
         integrationCardContent.Children.Add(CreateStatusLine("Provider stream playback", "Available on demand", "#A8D8BD"));
-        integrationCardContent.Children.Add(CreateStatusLine("Android account and cloud sync", "Not connected in Windows", "#AEB8C8"));
+        integrationCardContent.Children.Add(CreateStatusLine("Android account and cloud sync", "Not connected in Windows", "#B3B3B3"));
         integrationCardContent.Children.Add(CreateText(
             "Library sync is not implemented in this Windows milestone. Android remains opt-in and user-triggered; this app does not sync in the background.",
-            13, "#9DA8B9", TextWrapping.Wrap));
+            13, "#A7A7A7", TextWrapping.Wrap));
         PageContent.Children.Add(integrationCard);
 
         var interactionCard = CreateSettingsCard(

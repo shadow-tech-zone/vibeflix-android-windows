@@ -88,7 +88,7 @@ public sealed partial class MainWindow
             Padding = new Thickness(14, 10, 14, 10),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#161616"),
-            BorderBrush = Brush("#414141"),
+            BorderBrush = Brush("#383838"),
             BorderThickness = new Thickness(1),
             Child = content
         };
@@ -156,7 +156,6 @@ public sealed partial class MainWindow
         synopsis.MaxLines = 3;
         synopsis.Visibility = string.IsNullOrWhiteSpace(featured.Synopsis) ? Visibility.Collapsed : Visibility.Visible;
         copy.Children.Add(synopsis);
-        copy.Children.Add(CreateText("From the VibeFlix content source selected above", 10, "#B8B8B8", TextWrapping.Wrap));
 
         var actions = new StackPanel
         {
@@ -370,7 +369,7 @@ public sealed partial class MainWindow
             Padding = new Thickness(13, 6, 13, 6),
             CornerRadius = new CornerRadius(8),
             Background = Brush(selected ? "#F2F2F2" : "#161616"),
-            BorderBrush = Brush(selected ? "#F2F2F2" : "#414141"),
+            BorderBrush = Brush(selected ? "#F2F2F2" : "#383838"),
             BorderThickness = new Thickness(1),
             Foreground = Brush(selected ? "#141414" : "#E5E5E5"),
             FontSize = 12,
@@ -390,7 +389,7 @@ public sealed partial class MainWindow
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(CreateText(title, 24, "#FFFFFF", FontWeights.Medium, TextWrapping.Wrap));
-        var label = CreateText(eyebrow, 9, "#7E899C", FontWeights.SemiBold, characterSpacing: 75);
+        var label = CreateText(eyebrow, 9, "#858585", FontWeights.SemiBold, characterSpacing: 75);
         label.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(label, 1);
         grid.Children.Add(label);
@@ -413,7 +412,7 @@ public sealed partial class MainWindow
             navigation.Children.Add(CreateActionButton("← Previous", () => ChangeCatalogPage(-1)));
         }
 
-        navigation.Children.Add(CreateText($"Page {_catalogPage}", 12, "#AEB8C8", TextWrapping.NoWrap));
+        navigation.Children.Add(CreateText($"Page {_catalogPage}", 12, "#B3B3B3", TextWrapping.NoWrap));
         if (_catalogHasNext)
         {
             navigation.Children.Add(CreateActionButton("Next →", () => ChangeCatalogPage(1), isPrimary: true));
@@ -425,15 +424,15 @@ public sealed partial class MainWindow
     private Border CreateCompactEmptyState(string title, string description, bool pageInset = false)
     {
         var copy = new StackPanel { Spacing = 5 };
-        copy.Children.Add(CreateText(title, 15, "#E2E6EE", FontWeights.SemiBold));
-        copy.Children.Add(CreateText(description, 12, "#929EAF", TextWrapping.Wrap));
+        copy.Children.Add(CreateText(title, 15, "#E5E5E5", FontWeights.SemiBold));
+        copy.Children.Add(CreateText(description, 12, "#A7A7A7", TextWrapping.Wrap));
         return new Border
         {
             Margin = pageInset ? ContentMargin() : new Thickness(0),
             Padding = new Thickness(16, 13, 16, 13),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
-            BorderBrush = Brush("#414141"),
+            BorderBrush = Brush("#383838"),
             BorderThickness = new Thickness(1),
             Child = copy
         };
@@ -443,8 +442,8 @@ public sealed partial class MainWindow
     {
         var content = new StackPanel { Spacing = 12, MaxWidth = 560 };
         content.Children.Add(CreateText("YOUR LIBRARY, YOUR PACE", 9, "#B3B3B3", FontWeights.SemiBold, characterSpacing: 90));
-        content.Children.Add(CreateText(title, 21, "#F1F3F7", FontWeights.SemiBold, TextWrapping.Wrap));
-        content.Children.Add(CreateText(description, 13, "#9CA7B8", TextWrapping.Wrap));
+        content.Children.Add(CreateText(title, 21, "#F5F5F5", FontWeights.SemiBold, TextWrapping.Wrap));
+        content.Children.Add(CreateText(description, 13, "#B3B3B3", TextWrapping.Wrap));
         content.Children.Add(CreateActionButton(actionLabel, action, isPrimary: true));
         return new Border
         {
@@ -452,7 +451,7 @@ public sealed partial class MainWindow
             Padding = new Thickness(24),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
-            BorderBrush = Brush("#414141"),
+            BorderBrush = Brush("#383838"),
             BorderThickness = new Thickness(1),
             Child = content
         };
@@ -609,18 +608,30 @@ public sealed partial class MainWindow
         Border? titlePreview = null;
         if (!landscape && poster.Child is Grid posterGrid)
         {
-            var previewContent = new StackPanel { Spacing = 7, VerticalAlignment = VerticalAlignment.Center };
-            var previewTitle = CreateText(title.Name, 13, "#FFFFFF", FontWeights.SemiBold, TextWrapping.Wrap);
+            var previewContent = new StackPanel { Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+            var previewTitle = CreateText(title.Name, 14, "#FFFFFF", FontWeights.SemiBold, TextWrapping.Wrap);
             previewTitle.MaxLines = 2;
             previewTitle.TextTrimming = TextTrimming.CharacterEllipsis;
             previewContent.Children.Add(previewTitle);
-            var previewMetadata = CreateText(title.CardMetadata, 9, "#D2D8E2", TextWrapping.Wrap);
+            var previewMetadataParts = new[]
+            {
+                title.Year > 0 ? title.Year.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                title.Rating,
+                title.RuntimeMinutes > 0 ? title.RuntimeLabel : title.Kind,
+                title.Source
+            }.Where(part => !string.IsNullOrWhiteSpace(part));
+            var previewMetadata = CreateText(
+                string.Join("  ·  ", previewMetadataParts),
+                10,
+                "#D0D0D0",
+                FontWeights.SemiBold,
+                TextWrapping.Wrap);
             previewMetadata.MaxLines = 2;
             previewContent.Children.Add(previewMetadata);
             var synopsis = CreateText(
                 string.IsNullOrWhiteSpace(title.Synopsis) ? "Open the title for provider details." : title.Synopsis,
-                10,
-                "#E2E6EE",
+                11,
+                "#E5E5E5",
                 TextWrapping.Wrap);
             synopsis.MaxLines = 4;
             previewContent.Children.Add(synopsis);
@@ -643,7 +654,7 @@ public sealed partial class MainWindow
         void UpdatePosterEmphasis()
         {
             var highlighted = pointerOverPoster || posterHasFocus;
-            poster.BorderBrush = Brush(highlighted ? "#E34855" : "#3A3A3A");
+            poster.BorderBrush = Brush(highlighted ? "#E34855" : "#353535");
             poster.BorderThickness = new Thickness(highlighted ? 2 : 1);
             if (titlePreview is not null)
             {
@@ -680,7 +691,7 @@ public sealed partial class MainWindow
         var titleRow = new Grid();
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var titleText = CreateText(title.Name, 14, "#E7EAF0", FontWeights.SemiBold, TextWrapping.Wrap);
+        var titleText = CreateText(title.Name, 14, "#F5F5F5", FontWeights.SemiBold, TextWrapping.Wrap);
         titleText.MaxLines = 2;
         titleText.TextTrimming = TextTrimming.CharacterEllipsis;
         titleRow.Children.Add(titleText);
@@ -693,7 +704,7 @@ public sealed partial class MainWindow
         titleRow.Children.Add(saveButton);
         card.Children.Add(titleRow);
 
-        card.Children.Add(CreateText(title.CardMetadata, 10, "#8C98AA", TextWrapping.Wrap));
+        card.Children.Add(CreateText(title.CardMetadata, 11, "#A0A0A0", TextWrapping.Wrap));
 
         if (progress is not null)
         {
@@ -704,10 +715,10 @@ public sealed partial class MainWindow
                 Value = progress.Percent,
                 Height = 5,
                 Foreground = Brush("#E34855"),
-                Background = Brush("#343434")
+                Background = Brush("#2D2D2D")
             };
             card.Children.Add(progressBar);
-            card.Children.Add(CreateText(FormatProgressLabel(title, progress), 10, "#AEB8C8", TextWrapping.Wrap));
+            card.Children.Add(CreateText(FormatProgressLabel(title, progress), 10, "#B3B3B3", TextWrapping.Wrap));
             var resumeButton = CreateActionButton("Resume", () => ResumePlayback(title, progress));
             card.Children.Add(resumeButton);
         }
@@ -804,7 +815,7 @@ public sealed partial class MainWindow
             Background = new SolidColorBrush(Color.FromArgb(190, 12, 12, 12)),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
-            Child = CreateText(title.IsNew ? "NEW" : title.Kind.ToUpperInvariant(), 8, "#F4F3FB", FontWeights.SemiBold, characterSpacing: 55)
+            Child = CreateText(title.IsNew ? "NEW" : title.Kind.ToUpperInvariant(), 8, "#F5F5F5", FontWeights.SemiBold, characterSpacing: 55)
         };
         content.Children.Add(badge);
         grid.Children.Add(content);
@@ -813,7 +824,7 @@ public sealed partial class MainWindow
         {
             Height = height,
             CornerRadius = new CornerRadius(8),
-            BorderBrush = Brush("#3A3A3A"),
+            BorderBrush = Brush("#353535"),
             BorderThickness = new Thickness(1),
             Child = grid
         };
@@ -831,7 +842,7 @@ public sealed partial class MainWindow
             Padding = new Thickness(0),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
-            BorderBrush = Brush("#414141"),
+            BorderBrush = Brush("#383838"),
             BorderThickness = new Thickness(1),
             Foreground = Brush("#FFFFFF"),
             FontSize = 16,
@@ -872,15 +883,15 @@ public sealed partial class MainWindow
     private Border CreateSettingsCard(string heading, string description, out StackPanel content)
     {
         content = new StackPanel { Spacing = 11 };
-        content.Children.Add(CreateText(heading, 19, "#F0F2F7", FontWeights.SemiBold));
-        content.Children.Add(CreateText(description, 13, "#A1ACBC", TextWrapping.Wrap));
+        content.Children.Add(CreateText(heading, 19, "#F5F5F5", FontWeights.SemiBold));
+        content.Children.Add(CreateText(description, 13, "#B3B3B3", TextWrapping.Wrap));
         return new Border
         {
             Margin = ContentMargin(),
             Padding = new Thickness(20),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
-            BorderBrush = Brush("#414141"),
+            BorderBrush = Brush("#383838"),
             BorderThickness = new Thickness(1),
             Child = content
         };
@@ -889,8 +900,8 @@ public sealed partial class MainWindow
     private StackPanel CreateSettingsDetail(string label, string value)
     {
         var stack = new StackPanel { Spacing = 5 };
-        stack.Children.Add(CreateText(label.ToUpperInvariant(), 9, "#808C9F", FontWeights.SemiBold, characterSpacing: 70));
-        var valueText = CreateText(value, 12, "#CFD5DF", TextWrapping.Wrap);
+        stack.Children.Add(CreateText(label.ToUpperInvariant(), 9, "#8C8C8C", FontWeights.SemiBold, characterSpacing: 70));
+        var valueText = CreateText(value, 12, "#D0D0D0", TextWrapping.Wrap);
         valueText.IsTextSelectionEnabled = true;
         stack.Children.Add(valueText);
         return stack;
@@ -901,7 +912,7 @@ public sealed partial class MainWindow
         var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.Children.Add(CreateText(label, 13, "#D5DAE3", TextWrapping.Wrap));
+        row.Children.Add(CreateText(label, 13, "#D0D0D0", TextWrapping.Wrap));
         var status = CreateText(value, 12, color, FontWeights.SemiBold);
         Grid.SetColumn(status, 1);
         row.Children.Add(status);

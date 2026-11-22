@@ -40,12 +40,12 @@ public sealed partial class MainWindow
         var body = new StackPanel { Spacing = 16, Margin = new Thickness(0, 4, 0, 4) };
         var detailsPanel = new StackPanel { Spacing = 14 };
         var playerPanel = new StackPanel { Spacing = 10, Visibility = Visibility.Collapsed };
-        var feedback = CreateText(string.Empty, 12, "#B8C2D0", TextWrapping.Wrap);
-        var detailStatus = CreateText("Loading details from the selected provider…", 12, "#B8C2D0", TextWrapping.Wrap);
+        var feedback = CreateText(string.Empty, 12, "#B3B3B3", TextWrapping.Wrap);
+        var detailStatus = CreateText("Loading details from the selected provider…", 12, "#B3B3B3", TextWrapping.Wrap);
         var retryDetailsButton = CreateActionButton("Retry loading title details", () => { });
         retryDetailsButton.Visibility = Visibility.Collapsed;
-        var detailsFeedback = CreateText(string.Empty, 12, "#B8C2D0", TextWrapping.Wrap);
-        var playbackPositionText = CreateText("00:00 / 00:00", 11, "#AEB8C8");
+        var detailsFeedback = CreateText(string.Empty, 12, "#B3B3B3", TextWrapping.Wrap);
+        var playbackPositionText = CreateText("00:00 / 00:00", 11, "#B3B3B3");
         var playbackProgress = new ProgressBar
         {
             Minimum = 0,
@@ -53,7 +53,7 @@ public sealed partial class MainWindow
             Value = 0,
             Height = 5,
             Foreground = Brush("#E34855"),
-            Background = Brush("#343434")
+            Background = Brush("#2D2D2D")
         };
         var episodeRows = new StackPanel { Spacing = 7 };
         var episodeButtons = new Dictionary<string, (Button Button, string Label, string Synopsis)>(StringComparer.Ordinal);
@@ -122,11 +122,11 @@ public sealed partial class MainWindow
             title.RuntimeLabel,
             title.Source
         }.Where(part => !string.IsNullOrWhiteSpace(part));
-        copy.Children.Add(CreateText(string.Join("  ·  ", metadata), 12, "#B6C0CE", FontWeights.SemiBold, TextWrapping.Wrap));
+        copy.Children.Add(CreateText(string.Join("  ·  ", metadata), 12, "#D0D0D0", FontWeights.SemiBold, TextWrapping.Wrap));
         var synopsis = CreateText(
             string.IsNullOrWhiteSpace(title.Synopsis) ? "Provider details are loading." : title.Synopsis,
             13,
-            "#D4D9E2",
+            "#E5E5E5",
             TextWrapping.Wrap);
         copy.Children.Add(synopsis);
         copy.Children.Add(detailsFeedback);
@@ -153,7 +153,7 @@ public sealed partial class MainWindow
         detailsPanel.Children.Add(retryDetailsButton);
 
         var seasonPanel = new StackPanel { Spacing = 8, Visibility = Visibility.Collapsed };
-        seasonPanel.Children.Add(CreateText("Episodes", 18, "#F0F2F7", FontWeights.SemiBold));
+        seasonPanel.Children.Add(CreateText("Episodes", 18, "#F5F5F5", FontWeights.SemiBold));
         seasonPanel.Children.Add(seasonPicker);
         seasonPanel.Children.Add(episodeRows);
         detailsPanel.Children.Add(seasonPanel);
@@ -172,12 +172,12 @@ public sealed partial class MainWindow
         {
             MinHeight = 220,
             CornerRadius = new CornerRadius(8),
-            BorderBrush = Brush("#333333"),
+            BorderBrush = Brush("#353535"),
             BorderThickness = new Thickness(1),
             Background = Brush("#050505"),
             Child = mediaPlayerElement
         });
-        var playerTitle = CreateText(title.Name, 18, "#E9ECF2", FontWeights.SemiBold, TextWrapping.Wrap);
+        var playerTitle = CreateText(title.Name, 18, "#F5F5F5", FontWeights.SemiBold, TextWrapping.Wrap);
         playerPanel.Children.Add(playerTitle);
         playerPanel.Children.Add(feedback);
         playerPanel.Children.Add(playbackProgress);
@@ -292,7 +292,7 @@ public sealed partial class MainWindow
             playButton.Content = "▶  Play selected episode";
             playButton.IsEnabled = true;
             detailsFeedback.Text = $"Selected  ·  S{season.Number:00} E{episode.Number:00}  ·  {episode.Name}";
-            detailsFeedback.Foreground = Brush("#AEB8C8");
+            detailsFeedback.Foreground = Brush("#B3B3B3");
             SetDetailsStatus(string.Empty);
             foreach (var entry in episodeButtons)
             {
@@ -485,7 +485,7 @@ public sealed partial class MainWindow
                     string.Join("  /  ", activeTitle.Genres)
                 }.Where(part => !string.IsNullOrWhiteSpace(part));
                 detailsFeedback.Text = string.Join("  ·  ", updatedMetadata);
-                detailsFeedback.Foreground = Brush("#AEB8C8");
+                detailsFeedback.Foreground = Brush("#B3B3B3");
                 SetDetailsStatus(string.Empty);
                 retryDetailsButton.Visibility = Visibility.Collapsed;
 
