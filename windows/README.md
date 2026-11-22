@@ -33,7 +33,7 @@ The source-based research and original VibeFlix design direction are in [`UX-RES
 
 ## Build and verification
 
-This workspace has no local .NET/Windows build tools, so a native Windows compilation cannot be run here. `.github/workflows/build-windows.yml` runs the local progress-store smoke tests and compiles the app on a Windows GitHub Actions runner using the .NET 10 SDK. It restores and builds the x64 WinUI app for changes to `windows/`, the workflow, or project docs.
+This workspace has no local .NET/Windows build tools, so a native Windows compilation cannot be run here. `.github/workflows/build-windows.yml` runs the local progress-store smoke tests, compiles the app on a Windows GitHub Actions runner using the .NET 10 SDK, and uploads a short-lived x64 test-build artifact after a successful build. Download it from the latest successful **Build Windows client** run's **Artifacts** section. The ZIP is an unpackaged test bundle, not an installer; extract the entire folder and keep its files together.
 
 On a Windows development machine with the .NET 10 SDK and Windows App SDK prerequisites available:
 

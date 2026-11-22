@@ -57,3 +57,43 @@ jobs:
           }
 
           exit $buildExitCode
+
+      - name: Prepare Windows x64 test bundle
+        shell: pwsh
+        run: |
+          $executable = Get-ChildItem -Path "windows/VibeFlix.Windows/bin" -Filter "VibeFlix.Windows.exe" -File -Recurse | Select-Object -First 1
+          if ($null -eq $executable) {
+            throw "VibeFlix.Windows.exe was not found in the build output."
+          }
+
+          $bundleDirectory = Join-Path $env:RUNNER_TEMP "VibeFlix-Windows-x64-test"
+          New-Item -ItemType Directory -Path $bundleDirectory -Force | Out-Null
+          Copy-Item -Path (Join-Path $executable.DirectoryName "*") -Destination $bundleDirectory -Recurse -Force
+
+          $artwork = Join-Path $bundleDirectory "Assets/glass-orbit-hero.png"
+          if (-not (Test-Path $artwork)) {
+            throw "The sample hero artwork was not copied to the app output."
+          }
+
+          $testingInstructions = @'
+          VibeFlix Windows x64 - test build
+
+          1. Extract the entire ZIP to a local folder; keep all files together.
+          2. Run VibeFlix.Windows.exe.
+          3. This is an unpackaged test build, not an installer. Windows 10 (build 19041 or newer) or Windows 11 is required. Install the .NET 10 Desktop Runtime and Windows App SDK 2.7 runtime if they are not already available on the device.
+          4. To test playback, choose a local video file you own or otherwise have permission to play. No playable media or provider streams are bundled.
+          5. For captions, use a file with an embedded timed-text track; captions default to Off.
+
+          The catalogue and hero artwork are fictional samples. Playback progress is stored locally; media file paths are not saved.
+          '@
+          $testingInstructions | Set-Content -Path (Join-Path $bundleDirectory "TESTING.txt") -Encoding utf8
+
+          Write-Host "Prepared test bundle from $($executable.DirectoryName)"
+
+      - name: Upload Windows x64 test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeFlix-Windows-x64-test
+          path: ${{ runner.temp }}/VibeFlix-Windows-x64-test
+          if-no-files-found: error
+          retention-days: 14
