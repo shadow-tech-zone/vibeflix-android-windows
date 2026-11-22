@@ -42,6 +42,9 @@ public sealed partial class MainWindow
         var selectedEpisodeIndex = -1;
         var captionsPreviewEnabled = false;
         Action<int?> openPlayerPreview = _ => { };
+        Button captionsButton = null!;
+        Button previousEpisodeButton = null!;
+        Button nextEpisodeButton = null!;
 
         var detailGrid = new Grid { ColumnSpacing = 16 };
         detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
@@ -170,7 +173,7 @@ public sealed partial class MainWindow
         audioButton.IsEnabled = false;
         ToolTipService.SetToolTip(audioButton, "Audio tracks become available when Windows playback is connected.");
         playerControls.Children.Add(audioButton);
-        var captionsButton = CreateActionButton("CC · Off", () =>
+        captionsButton = CreateActionButton("CC · Off", () =>
         {
             captionsPreviewEnabled = !captionsPreviewEnabled;
             UpdatePlayerPreview();
@@ -179,8 +182,8 @@ public sealed partial class MainWindow
         playerPanel.Children.Add(playerControls);
 
         var episodeNavigation = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var previousEpisodeButton = CreateActionButton("← Previous episode", () => NavigateEpisode(-1));
-        var nextEpisodeButton = CreateActionButton("Next episode →", () => NavigateEpisode(1));
+        previousEpisodeButton = CreateActionButton("← Previous episode", () => NavigateEpisode(-1));
+        nextEpisodeButton = CreateActionButton("Next episode →", () => NavigateEpisode(1));
         previousEpisodeButton.IsEnabled = false;
         nextEpisodeButton.IsEnabled = false;
         episodeNavigation.Children.Add(previousEpisodeButton);
