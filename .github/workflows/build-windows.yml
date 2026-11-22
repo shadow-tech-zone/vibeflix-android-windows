@@ -35,4 +35,22 @@ jobs:
         run: dotnet restore windows/VibeFlix.Windows/VibeFlix.Windows.csproj -p:Platform=x64
 
       - name: Build Windows app
-        run: dotnet build windows/VibeFlix.Windows/VibeFlix.Windows.csproj --configuration Release --no-restore -p:Platform=x64
+        shell: pwsh
+        run: |
+          $buildOutput = & dotnet build windows/VibeFlix.Windows/VibeFlix.Windows.csproj --configuration Release --no-restore -p:Platform=x64 2>&1
+          $buildExitCode = $LASTEXITCODE
+          $buildOutput | ForEach-Object { Write-Host $_ }
+
+          if ($buildExitCode -ne 0) {
+            $diagnostics = @($buildOutput | Where-Object { $_.ToString() -match '(?i)\berror\s+[A-Z]+\d+\s*:' })
+            if ($diagnostics.Count -eq 0) {
+              $diagnostics = @('dotnet build failed; inspect the Windows job log.')
+            }
+
+            foreach ($diagnostic in $diagnostics) {
+              $message = $diagnostic.ToString().Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Output "::error title=WinUI build diagnostic::$message"
+            }
+          }
+
+          exit $buildExitCode
