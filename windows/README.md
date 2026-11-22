@@ -2,7 +2,7 @@
 
 VibeFlix Windows is a native WinUI 3 desktop app targeting .NET 10 and Windows App SDK 2.7. It uses the same Server 1 and Server 2 catalog resources as the Android client; catalog page paths are identifiers, not playable stream URLs. A stream is resolved only after the user chooses **Play**, then passed to the Windows-native media player. Stream addresses, provider headers, and credentials are not saved to disk.
 
-The original VibeFlix interface uses a compact brand/navigation/search/source header, a cinematic feature area, category controls, and horizontal title shelves. It follows broad desktop streaming conventions without copying Netflix branding, assets, or screens. The included generated artwork is design/placeholder art, not catalog content or playable media.
+The original VibeFlix interface uses a compact brand/navigation/search/source header, a cinematic feature area, category controls, and horizontal title shelves. The header reflows navigation beneath the search/source row below 900 effective pixels; title details stack the poster above the actions below 680 pixels. Page gutters, shelf cards, grids, the hero, and the open details/player dialog adapt to window resizing. Controls use system focus visuals and keyboard-accessible actions, with no hover-only functionality. These are VibeFlix design choices, not claims about Netflix's exact Windows UI. The included generated artwork is design/placeholder art, not catalog content or playable media.
 
 ## Project layout
 
@@ -20,7 +20,7 @@ The original VibeFlix interface uses a compact brand/navigation/search/source he
 ## Catalog and playback behavior
 
 - Browse and search the available Server 1 and Server 2 catalogs, with a source selector, categories, and pagination where the selected provider exposes them. Provider availability and content can vary by region and over time; an unavailable provider is reported in the UI.
-- Selecting a title loads provider metadata. Series seasons and episode lists are loaded from the relevant provider resources when needed.
+- Selecting a title loads provider metadata. Series seasons and episode lists are loaded from the relevant provider resources when needed. Choosing an episode highlights it and updates the **Play selected episode** action; browsing the episode list does not start playback by itself. Resume actions continue directly from the saved position where the stream supports seeking.
 - Choosing **Play** resolves the selected provider page into supported HTTPS HLS or MP4 candidates. For adaptive HLS, Windows receives provider request headers through its adaptive-streaming client. The app does not derive a stream URL from a catalog path or persist a resolved stream address.
 - A provider may be unavailable, restrict a request, change its response format, or return media Windows cannot play. In those cases, playback can fail even when catalog browsing works. Server 2 may return multiple candidates; **Try another stream** allows trying another candidate.
 - The Windows player exposes the platform's transport controls. Resume positions are stored per title and, for series, per stable season/episode key. Progress is checkpointed during playback and when the details/player dialog closes. A completed movie or final series episode is added to local History; completing a non-final episode only clears that episode's resume marker.

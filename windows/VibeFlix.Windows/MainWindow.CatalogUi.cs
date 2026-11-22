@@ -18,12 +18,31 @@ public sealed partial class MainWindow
 {
     private readonly Dictionary<string, BitmapImage?> _artworkCache = new(StringComparer.Ordinal);
 
+    private double PageViewportWidth => PageScrollViewer.ActualWidth > 0
+        ? PageScrollViewer.ActualWidth
+        : Math.Max(320, AppRoot.ActualWidth);
+
+    private double ContentGutter => PageViewportWidth switch
+    {
+        < 520 => 16,
+        < 900 => 24,
+        _ => 42
+    };
+
+    private Thickness ContentMargin(double top = 0, double bottom = 0) =>
+        new(ContentGutter, top, ContentGutter, bottom);
+
+    private double ShelfCardWidth => Math.Min(
+        272,
+        Math.Max(128, (PageViewportWidth - (2 * ContentGutter)) * 0.68));
+
     private StackPanel CreatePageHeader(string eyebrow, string title, string description)
     {
-        var stack = new StackPanel { Spacing = 8, Margin = new Thickness(42, 24, 42, 0) };
+        var compact = PageViewportWidth < 560;
+        var stack = new StackPanel { Spacing = 8, Margin = ContentMargin(20) };
         stack.Children.Add(CreateText(eyebrow, 10, "#B3B3B3", FontWeights.SemiBold, characterSpacing: 120));
-        stack.Children.Add(CreateText(title, 36, "#FFFFFF", FontWeights.SemiBold, TextWrapping.Wrap));
-        stack.Children.Add(CreateText(description, 14, "#B3B3B3", TextWrapping.Wrap));
+        stack.Children.Add(CreateText(title, compact ? 30 : 36, "#FFFFFF", FontWeights.SemiBold, TextWrapping.Wrap));
+        stack.Children.Add(CreateText(description, compact ? 13 : 14, "#B3B3B3", TextWrapping.Wrap));
         return stack;
     }
 
@@ -61,7 +80,7 @@ public sealed partial class MainWindow
 
         return new Border
         {
-            Margin = new Thickness(42, 0, 42, 0),
+            Margin = ContentMargin(),
             Padding = new Thickness(14, 10, 14, 10),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#161616"),
@@ -73,12 +92,17 @@ public sealed partial class MainWindow
 
     private Border CreateHero(CatalogTitle featured)
     {
-        var compactHero = PageScrollViewer.ActualWidth < 760;
-        var targetHeight = AppRoot.ActualHeight > 0 ? AppRoot.ActualHeight * 0.52 : 500;
+        var heroWidth = PageViewportWidth;
+        var compactHero = heroWidth < 760;
+        var narrowHero = heroWidth < 520;
+        var targetHeight = AppRoot.ActualHeight > 0 ? AppRoot.ActualHeight * 0.46 : 460;
         var heroGrid = new Grid();
         var hero = new Border
         {
-            Height = Math.Clamp(targetHeight, compactHero ? 330 : 380, compactHero ? 450 : 580),
+            Height = Math.Clamp(
+                targetHeight,
+                narrowHero ? 280 : compactHero ? 300 : 340,
+                narrowHero ? 380 : compactHero ? 420 : 540),
             BorderBrush = Brush("#222222"),
             BorderThickness = new Thickness(0),
             Background = CreateHeroBackground(featured),
@@ -105,15 +129,16 @@ public sealed partial class MainWindow
         bottomScrim.GradientStops.Add(new GradientStop { Color = ColorFromHex("D9050505"), Offset = 1 });
         heroGrid.Children.Add(new Border { Background = bottomScrim, IsHitTestVisible = false });
 
+        var copyMargin = narrowHero ? 18 : compactHero ? 26 : 48;
         var copy = new StackPanel
         {
-            Margin = new Thickness(compactHero ? 26 : 48, 30, compactHero ? 26 : 48, 36),
+            Margin = new Thickness(copyMargin, narrowHero ? 20 : 30, copyMargin, narrowHero ? 24 : 36),
             MaxWidth = compactHero ? 460 : 590,
             VerticalAlignment = VerticalAlignment.Center,
-            Spacing = compactHero ? 10 : 14
+            Spacing = narrowHero ? 8 : compactHero ? 10 : 14
         };
         copy.Children.Add(CreateText($"VIBEFLIX FEATURE  ·  {featured.Source.ToUpperInvariant()}", 10, "#D0D0D0", FontWeights.SemiBold, characterSpacing: 105));
-        copy.Children.Add(CreateText(featured.Name, compactHero ? 36 : 56, "#FFFFFF", FontWeights.Black, TextWrapping.Wrap));
+        copy.Children.Add(CreateText(featured.Name, narrowHero ? 30 : compactHero ? 36 : 52, "#FFFFFF", FontWeights.Black, TextWrapping.Wrap));
         var metadata = new[]
         {
             featured.Year > 0 ? featured.Year.ToString(CultureInfo.InvariantCulture) : string.Empty,
@@ -195,11 +220,11 @@ public sealed partial class MainWindow
 
     private StackPanel CreateBrowseFilters()
     {
-        var wrapper = new StackPanel { Margin = new Thickness(42, 0, 42, 0) };
+        var wrapper = new StackPanel { Margin = ContentMargin() };
         var scroller = new ScrollViewer
         {
-            Height = 40,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            Height = 56,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollMode = ScrollMode.Enabled,
             VerticalScrollMode = ScrollMode.Disabled,
@@ -247,7 +272,8 @@ public sealed partial class MainWindow
 
         return new ScrollViewer
         {
-            Height = 44,
+            Height = 56,
+            Margin = ContentMargin(),
             Content = shortcuts,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -320,6 +346,18 @@ public sealed partial class MainWindow
         menu.Items.Add(item);
     }
 
+    private void ApplyButtonHover(Button button, string restingBackground, string hoverBackground)
+    {
+        button.UseSystemFocusVisuals = true;
+        button.PointerEntered += (_, _) => button.Background = Brush(hoverBackground);
+        button.PointerExited += (_, _) =>
+        {
+            button.Background = Brush(button.Tag is string state && state == "SelectedEpisode"
+                ? "#2B1417"
+                : restingBackground);
+        };
+    }
+
     private Button CreateFilterChip(string label, bool selected)
     {
         var button = new Button
@@ -333,15 +371,18 @@ public sealed partial class MainWindow
             Foreground = Brush(selected ? "#141414" : "#E5E5E5"),
             FontSize = 12,
             FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
-            VerticalAlignment = VerticalAlignment.Center
+            MinHeight = 40,
+            VerticalAlignment = VerticalAlignment.Center,
+            UseSystemFocusVisuals = true
         };
         AutomationProperties.SetName(button, label);
+        ApplyButtonHover(button, selected ? "#F2F2F2" : "#161616", selected ? "#FFFFFF" : "#2D2D2D");
         return button;
     }
 
     private Grid CreateSectionHeading(string title, string eyebrow)
     {
-        var grid = new Grid { Margin = new Thickness(42, 4, 42, 0) };
+        var grid = new Grid { Margin = ContentMargin(4) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(CreateText(title, 24, "#FFFFFF", FontWeights.Medium, TextWrapping.Wrap));
@@ -360,7 +401,7 @@ public sealed partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Spacing = 12,
-            Margin = new Thickness(42, 0, 42, 18),
+            Margin = ContentMargin(0, 18),
             Visibility = _catalogPage > 1 || _catalogHasNext ? Visibility.Visible : Visibility.Collapsed
         };
         if (_catalogPage > 1)
@@ -377,13 +418,14 @@ public sealed partial class MainWindow
         return navigation;
     }
 
-    private Border CreateCompactEmptyState(string title, string description)
+    private Border CreateCompactEmptyState(string title, string description, bool pageInset = false)
     {
         var copy = new StackPanel { Spacing = 5 };
         copy.Children.Add(CreateText(title, 15, "#E2E6EE", FontWeights.SemiBold));
         copy.Children.Add(CreateText(description, 12, "#929EAF", TextWrapping.Wrap));
         return new Border
         {
+            Margin = pageInset ? ContentMargin() : new Thickness(0),
             Padding = new Thickness(16, 13, 16, 13),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
@@ -402,6 +444,7 @@ public sealed partial class MainWindow
         content.Children.Add(CreateActionButton(actionLabel, action, isPrimary: true));
         return new Border
         {
+            Margin = ContentMargin(),
             Padding = new Thickness(24),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
@@ -415,7 +458,7 @@ public sealed partial class MainWindow
     {
         var scroller = new ScrollViewer
         {
-            Margin = new Thickness(42, 0, 42, 0),
+            Margin = ContentMargin(),
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollMode = ScrollMode.Enabled,
@@ -423,9 +466,10 @@ public sealed partial class MainWindow
             ZoomMode = ZoomMode.Disabled
         };
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
+        var cardWidth = ShelfCardWidth;
         foreach (var title in titles)
         {
-            row.Children.Add(CreateTitleCard(title, 272, landscape: true));
+            row.Children.Add(CreateTitleCard(title, cardWidth, landscape: true));
         }
 
         scroller.Content = row;
@@ -437,7 +481,7 @@ public sealed partial class MainWindow
     {
         var scroller = new ScrollViewer
         {
-            Margin = new Thickness(42, 0, 42, 0),
+            Margin = ContentMargin(),
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollMode = ScrollMode.Enabled,
@@ -445,11 +489,12 @@ public sealed partial class MainWindow
             ZoomMode = ZoomMode.Disabled
         };
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 18 };
+        var cardWidth = Math.Min(ShelfCardWidth, 246);
         foreach (var entry in progress)
         {
             row.Children.Add(CreateTitleCard(
                 entry.Title,
-                246,
+                cardWidth,
                 entry.Progress,
                 "Remove resume marker",
                 () => RemoveProgress(entry.Title, entry.Progress),
@@ -487,27 +532,28 @@ public sealed partial class MainWindow
 
     private Grid CreateResponsiveGrid(int count, Func<int, double, FrameworkElement> createItem)
     {
-        var viewportWidth = PageScrollViewer.ActualWidth;
-        if (viewportWidth < 300)
-        {
-            viewportWidth = Math.Max(640, AppRoot.ActualWidth - 70);
-        }
-
-        var availableWidth = Math.Max(330, viewportWidth - 70);
+        var viewportWidth = PageViewportWidth;
+        var gutter = ContentGutter;
+        var columnSpacing = viewportWidth < 520 ? 12 : 18;
+        var availableWidth = Math.Max(160, viewportWidth - (2 * gutter));
         var columns = availableWidth switch
         {
             >= 1450 => 6,
             >= 1190 => 5,
             >= 930 => 4,
             >= 660 => 3,
-            _ => 2
+            >= 320 => 2,
+            _ => 1
         };
-        var cardWidth = Math.Min(178, Math.Max(140, (availableWidth - ((columns - 1) * 18)) / columns));
+        var cardWidth = Math.Min(
+            178,
+            Math.Max(112, (availableWidth - ((columns - 1) * columnSpacing)) / columns));
 
         var grid = new Grid
         {
-            ColumnSpacing = 18,
-            RowSpacing = 24,
+            Margin = ContentMargin(),
+            ColumnSpacing = columnSpacing,
+            RowSpacing = viewportWidth < 520 ? 18 : 24,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         for (var column = 0; column < columns; column++)
@@ -543,9 +589,10 @@ public sealed partial class MainWindow
     {
         var posterHeight = width * (landscape ? 0.56 : 1.26);
         var card = new StackPanel { Width = width, Spacing = 8 };
+        var poster = CreatePoster(title, posterHeight);
         var posterButton = new Button
         {
-            Content = CreatePoster(title, posterHeight),
+            Content = poster,
             Width = width,
             Height = posterHeight,
             Padding = new Thickness(0),
@@ -553,29 +600,36 @@ public sealed partial class MainWindow
             BorderThickness = new Thickness(0),
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Stretch,
-            RenderTransformOrigin = new Point(0.5, 0.5)
+            UseSystemFocusVisuals = true
         };
-        var hoverScale = new ScaleTransform();
-        posterButton.RenderTransform = hoverScale;
+        var pointerOverPoster = false;
+        var posterHasFocus = false;
+        void UpdatePosterEmphasis()
+        {
+            var highlighted = pointerOverPoster || posterHasFocus;
+            poster.BorderBrush = Brush(highlighted ? "#E34855" : "#3A3A3A");
+            poster.BorderThickness = new Thickness(highlighted ? 2 : 1);
+        }
+
         posterButton.PointerEntered += (_, _) =>
         {
-            hoverScale.ScaleX = 1.035;
-            hoverScale.ScaleY = 1.035;
+            pointerOverPoster = true;
+            UpdatePosterEmphasis();
         };
         posterButton.PointerExited += (_, _) =>
         {
-            hoverScale.ScaleX = 1;
-            hoverScale.ScaleY = 1;
+            pointerOverPoster = false;
+            UpdatePosterEmphasis();
         };
         posterButton.GotFocus += (_, _) =>
         {
-            hoverScale.ScaleX = 1.035;
-            hoverScale.ScaleY = 1.035;
+            posterHasFocus = true;
+            UpdatePosterEmphasis();
         };
         posterButton.LostFocus += (_, _) =>
         {
-            hoverScale.ScaleX = 1;
-            hoverScale.ScaleY = 1;
+            posterHasFocus = false;
+            UpdatePosterEmphasis();
         };
         AutomationProperties.SetName(posterButton, $"Open details for {title.Name}");
         AutomationProperties.SetHelpText(posterButton, title.Synopsis);
@@ -591,7 +645,9 @@ public sealed partial class MainWindow
         titleText.TextTrimming = TextTrimming.CharacterEllipsis;
         titleRow.Children.Add(titleText);
         var saved = _library.IsSaved(title.Id);
-        var saveButton = CreateSmallActionButton(saved ? "✓" : "+", saved ? "Remove from My List" : "Add to My List");
+        var saveButton = CreateSmallActionButton(
+            saved ? "✓" : "+",
+            saved ? $"Remove {title.Name} from My List" : $"Add {title.Name} to My List");
         saveButton.Click += (_, _) => ToggleSaved(title, saveButton);
         Grid.SetColumn(saveButton, 1);
         titleRow.Children.Add(saveButton);
@@ -728,8 +784,10 @@ public sealed partial class MainWindow
         var button = new Button
         {
             Content = text,
-            Width = 32,
-            Height = 32,
+            Width = 40,
+            Height = 40,
+            MinWidth = 40,
+            MinHeight = 40,
             Padding = new Thickness(0),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),
@@ -738,30 +796,36 @@ public sealed partial class MainWindow
             Foreground = Brush("#FFFFFF"),
             FontSize = 16,
             FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            UseSystemFocusVisuals = true
         };
         AutomationProperties.SetName(button, accessibleName);
         ToolTipService.SetToolTip(button, accessibleName);
+        ApplyButtonHover(button, "#232323", "#2D2D2D");
         return button;
     }
 
     private Button CreateActionButton(string label, Action action, bool isPrimary = false)
     {
+        var restingBackground = isPrimary ? "#E34855" : "#232323";
         var button = new Button
         {
             Content = label,
             Padding = new Thickness(16, 10, 16, 10),
+            MinHeight = 44,
             CornerRadius = new CornerRadius(8),
-            Background = Brush(isPrimary ? "#E34855" : "#232323"),
-            BorderBrush = Brush(isPrimary ? "#E34855" : "#232323"),
+            Background = Brush(restingBackground),
+            BorderBrush = Brush(restingBackground),
             BorderThickness = new Thickness(1),
             Foreground = Brush("#FFFFFF"),
             FontSize = 14,
             FontWeight = isPrimary ? FontWeights.SemiBold : FontWeights.Normal,
-            HorizontalAlignment = HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left,
+            UseSystemFocusVisuals = true
         };
         button.Click += (_, _) => action();
         AutomationProperties.SetName(button, label);
+        ApplyButtonHover(button, restingBackground, isPrimary ? "#F05A66" : "#2D2D2D");
         return button;
     }
 
@@ -772,6 +836,7 @@ public sealed partial class MainWindow
         content.Children.Add(CreateText(description, 13, "#A1ACBC", TextWrapping.Wrap));
         return new Border
         {
+            Margin = ContentMargin(),
             Padding = new Thickness(20),
             CornerRadius = new CornerRadius(8),
             Background = Brush("#232323"),

@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Input;
 using VibeFlix.Windows.Models;
@@ -378,9 +379,38 @@ public sealed partial class MainWindow : Window
 
     private void AppRoot_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        PreviewBadge.Visibility = e.NewSize.Width < 1020 ? Visibility.Collapsed : Visibility.Visible;
-        SearchBox.Width = e.NewSize.Width < 820 ? 128 : e.NewSize.Width < 1120 ? 170 : 220;
-        ServerPicker.Width = e.NewSize.Width < 820 ? 106 : e.NewSize.Width < 1120 ? 124 : 140;
+        var width = e.NewSize.Width;
+        var compact = width < 900;
+        var veryCompact = width < 400;
+        var horizontalPadding = veryCompact ? 8 : width < 560 ? 14 : compact ? 18 : 24;
+        AppHeader.Padding = new Thickness(horizontalPadding, 7, horizontalPadding, 7);
+        HeaderLayout.ColumnSpacing = compact ? 8 : 14;
+        HeaderLayout.RowSpacing = compact ? 2 : 0;
+
+        Grid.SetRow(NavigationScrollViewer, compact ? 1 : 0);
+        Grid.SetColumn(NavigationScrollViewer, compact ? 0 : 1);
+        Grid.SetColumnSpan(NavigationScrollViewer, compact ? 3 : 1);
+        NavigationScrollViewer.Margin = compact
+            ? new Thickness(0, 3, 0, 0)
+            : new Thickness(12, 0, 8, 0);
+
+        if (compact)
+        {
+            SearchBox.Width = Math.Clamp(width - (veryCompact ? 230 : 270), veryCompact ? 64 : 80, 220);
+            ServerPicker.Width = veryCompact ? 90 : width < 560 ? 104 : 116;
+        }
+        else if (width < 1120)
+        {
+            SearchBox.Width = 170;
+            ServerPicker.Width = 124;
+        }
+        else
+        {
+            SearchBox.Width = 220;
+            ServerPicker.Width = 140;
+        }
+
+        PreviewBadge.Visibility = width < 1120 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void PageScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -457,7 +487,7 @@ public sealed partial class MainWindow : Window
             PageContent.Children.Add(CreatePreviewNotice());
             if (_catalogLoading)
             {
-                PageContent.Children.Add(CreateCompactEmptyState("Loading provider catalog…", "Fetching current titles and posters from the selected source."));
+                PageContent.Children.Add(CreateCompactEmptyState("Loading provider catalog…", "Fetching current titles and posters from the selected source.", pageInset: true));
                 return;
             }
 
@@ -563,7 +593,8 @@ public sealed partial class MainWindow : Window
         {
             PageContent.Children.Add(CreateCompactEmptyState(
                 "Searching provider catalog…",
-                query.Length == 0 ? "Loading current titles from the selected source." : "Waiting for matching results."));
+                query.Length == 0 ? "Loading current titles from the selected source." : "Waiting for matching results.",
+                pageInset: true));
             return;
         }
 
@@ -585,7 +616,8 @@ public sealed partial class MainWindow : Window
             {
                 PageContent.Children.Add(CreateCompactEmptyState(
                     "No catalog titles loaded yet.",
-                    "Choose a category above or retry the selected source."));
+                    "Choose a category above or retry the selected source.",
+                    pageInset: true));
                 return;
             }
 
@@ -858,11 +890,12 @@ public sealed partial class MainWindow : Window
         foreach (var button in NavigationButtons())
         {
             var selected = string.Equals(button.Tag as string, selectedPage, StringComparison.Ordinal);
-            button.Background = Brush("#00000000");
-            button.BorderBrush = Brush("#00000000");
-            button.BorderThickness = new Thickness(0);
+            button.Background = Brush(selected ? "#211315" : "#00000000");
+            button.BorderBrush = Brush(selected ? "#E34855" : "#00000000");
+            button.BorderThickness = new Thickness(0, 0, 0, 2);
             button.Foreground = Brush(selected ? "#FFFFFF" : "#B3B3B3");
             button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+            AutomationProperties.SetHelpText(button, selected ? "Current navigation destination." : string.Empty);
         }
     }
 

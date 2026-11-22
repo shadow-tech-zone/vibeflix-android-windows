@@ -20,17 +20,20 @@ public sealed partial class MainWindow
         var activeTitle = title;
         var detailCancellation = new CancellationTokenSource();
         var dispatcher = DispatcherQueue.GetForCurrentThread();
+        var windowWidth = AppRoot.ActualWidth > 0 ? AppRoot.ActualWidth : 1024;
+        var windowHeight = AppRoot.ActualHeight > 0 ? AppRoot.ActualHeight : 900;
+        var compactDetails = windowWidth < 680;
         var dialog = new ContentDialog
         {
             Title = title.Name,
             CloseButtonText = "Close",
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = AppRoot.XamlRoot,
-            MaxWidth = 980
+            MaxWidth = Math.Clamp(windowWidth - 32, 320, 980)
         };
         var scroll = new ScrollViewer
         {
-            MaxHeight = 720,
+            MaxHeight = Math.Clamp(windowHeight - 120, 320, 720),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
@@ -39,6 +42,8 @@ public sealed partial class MainWindow
         var playerPanel = new StackPanel { Spacing = 10, Visibility = Visibility.Collapsed };
         var feedback = CreateText(string.Empty, 12, "#B8C2D0", TextWrapping.Wrap);
         var detailStatus = CreateText("Loading details from the selected provider…", 12, "#B8C2D0", TextWrapping.Wrap);
+        var retryDetailsButton = CreateActionButton("Retry loading title details", () => { });
+        retryDetailsButton.Visibility = Visibility.Collapsed;
         var detailsFeedback = CreateText(string.Empty, 12, "#B8C2D0", TextWrapping.Wrap);
         var playbackPositionText = CreateText("00:00 / 00:00", 11, "#AEB8C8");
         var playbackProgress = new ProgressBar
@@ -51,15 +56,22 @@ public sealed partial class MainWindow
             Background = Brush("#343434")
         };
         var episodeRows = new StackPanel { Spacing = 7 };
+        var episodeButtons = new Dictionary<string, (Button Button, string Label, string Synopsis)>(StringComparer.Ordinal);
         var seasonPicker = new ComboBox
         {
-            Width = 300,
+            Width = Math.Clamp(windowWidth - 96, 200, 360),
             HorizontalAlignment = HorizontalAlignment.Left,
             Visibility = Visibility.Collapsed
         };
         AutomationProperties.SetName(seasonPicker, "Select a season");
+        AutomationProperties.SetHelpText(seasonPicker, "Choose a season to load its episodes.");
+        AutomationProperties.SetName(episodeRows, "Episode selection");
+        AutomationProperties.SetName(detailStatus, "Title details status");
+        AutomationProperties.SetName(feedback, "Playback status");
+        AutomationProperties.SetName(playbackProgress, "Playback progress");
+        AutomationProperties.SetName(playbackPositionText, "Playback position and duration");
         Button? listButton = null;
-        var playButton = CreateActionButton("▶  Play", () => { });
+        var playButton = CreateActionButton("▶  Play", () => { }, isPrimary: true);
         playButton.IsEnabled = false;
         var playbackStarted = false;
         var activePlaybackPath = string.Empty;
@@ -81,11 +93,28 @@ public sealed partial class MainWindow
         TypedEventHandler<MediaPlayer, MediaPlayerFailedEventArgs>? mediaFailedHandler = null;
         TypedEventHandler<MediaPlayer, object>? mediaEndedHandler = null;
 
-        var detailHeader = new Grid { ColumnSpacing = 18 };
-        detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
-        detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        detailHeader.Children.Add(CreatePoster(title, 214));
+        var detailHeader = new Grid
+        {
+            ColumnSpacing = compactDetails ? 0 : 18,
+            RowSpacing = 14
+        };
+        var titlePoster = CreatePoster(title, 214);
         var copy = new StackPanel { Spacing = 9 };
+        if (compactDetails)
+        {
+            detailHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            detailHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            titlePoster.Width = 148;
+            titlePoster.HorizontalAlignment = HorizontalAlignment.Left;
+            detailHeader.Children.Add(titlePoster);
+        }
+        else
+        {
+            detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
+            detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            detailHeader.Children.Add(titlePoster);
+        }
+
         var metadata = new[]
         {
             title.Year > 0 ? title.Year.ToString() : string.Empty,
@@ -109,10 +138,19 @@ public sealed partial class MainWindow
         actions.Children.Add(listButton);
         actions.Children.Add(CreateActionButton("Mark watched manually", () => MarkWatchedFromDetails(activeTitle, detailsFeedback)));
         copy.Children.Add(actions);
-        Grid.SetColumn(copy, 1);
+        if (compactDetails)
+        {
+            Grid.SetRow(copy, 1);
+        }
+        else
+        {
+            Grid.SetColumn(copy, 1);
+        }
+
         detailHeader.Children.Add(copy);
         detailsPanel.Children.Add(detailHeader);
         detailsPanel.Children.Add(detailStatus);
+        detailsPanel.Children.Add(retryDetailsButton);
 
         var seasonPanel = new StackPanel { Spacing = 8, Visibility = Visibility.Collapsed };
         seasonPanel.Children.Add(CreateText("Episodes", 18, "#F0F2F7", FontWeights.SemiBold));
@@ -122,16 +160,17 @@ public sealed partial class MainWindow
 
         var mediaPlayerElement = new MediaPlayerElement
         {
-            Height = 430,
-            MinHeight = 260,
+            Height = Math.Clamp(windowWidth * 0.46, 220, 430),
+            MinHeight = 200,
             AutoPlay = false,
             AreTransportControlsEnabled = true,
             RequestedTheme = ElementTheme.Dark
         };
+        AutomationProperties.SetName(mediaPlayerElement, $"VibeFlix player for {title.Name}");
         mediaPlayerElement.SetMediaPlayer(_playback.Player);
         playerPanel.Children.Add(new Border
         {
-            MinHeight = 260,
+            MinHeight = 220,
             CornerRadius = new CornerRadius(8),
             BorderBrush = Brush("#333333"),
             BorderThickness = new Thickness(1),
@@ -158,6 +197,50 @@ public sealed partial class MainWindow
         playerActions.Children.Add(tryNextStreamButton);
         playerActions.Children.Add(backToDetailsButton);
         playerPanel.Children.Add(playerActions);
+
+        void UpdateResponsiveDetailsLayout(double width, double height)
+        {
+            var nextCompactLayout = width < 680;
+            if (nextCompactLayout != compactDetails)
+            {
+                compactDetails = nextCompactLayout;
+                detailHeader.RowDefinitions.Clear();
+                detailHeader.ColumnDefinitions.Clear();
+                if (compactDetails)
+                {
+                    detailHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    detailHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    titlePoster.Width = 148;
+                    titlePoster.HorizontalAlignment = HorizontalAlignment.Left;
+                    Grid.SetRow(titlePoster, 0);
+                    Grid.SetColumn(titlePoster, 0);
+                    Grid.SetRow(copy, 1);
+                    Grid.SetColumn(copy, 0);
+                }
+                else
+                {
+                    detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
+                    detailHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    titlePoster.Width = double.NaN;
+                    titlePoster.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    Grid.SetRow(titlePoster, 0);
+                    Grid.SetColumn(titlePoster, 0);
+                    Grid.SetRow(copy, 0);
+                    Grid.SetColumn(copy, 1);
+                }
+
+                detailHeader.ColumnSpacing = compactDetails ? 0 : 18;
+                detailHeader.RowSpacing = 14;
+            }
+
+            dialog.MaxWidth = Math.Clamp(width - 32, 320, 980);
+            scroll.MaxHeight = Math.Clamp(height - 120, 320, 720);
+            mediaPlayerElement.Height = Math.Clamp(width * 0.46, 220, 430);
+            seasonPicker.Width = Math.Clamp(width - 96, 200, 360);
+        }
+
+        var detailsResizeHandler = new SizeChangedEventHandler((_, args) =>
+            UpdateResponsiveDetailsLayout(args.NewSize.Width, args.NewSize.Height));
 
         body.Children.Add(detailsPanel);
         body.Children.Add(playerPanel);
@@ -211,12 +294,27 @@ public sealed partial class MainWindow
             detailsFeedback.Text = $"Selected  ·  S{season.Number:00} E{episode.Number:00}  ·  {episode.Name}";
             detailsFeedback.Foreground = Brush("#AEB8C8");
             SetDetailsStatus(string.Empty);
+            foreach (var entry in episodeButtons)
+            {
+                var selected = string.Equals(entry.Key, activeEpisodeKey, StringComparison.Ordinal);
+                entry.Value.Button.Tag = selected ? "SelectedEpisode" : null;
+                entry.Value.Button.Content = $"{(selected ? "✓" : "  ")}  {entry.Value.Label}";
+                entry.Value.Button.Background = Brush(selected ? "#2B1417" : "#232323");
+                entry.Value.Button.BorderBrush = Brush(selected ? "#E34855" : "#232323");
+                AutomationProperties.SetHelpText(
+                    entry.Value.Button,
+                    selected
+                        ? $"Selected episode. Press Play selected episode to start. {entry.Value.Synopsis}".Trim()
+                        : $"Select this episode. {entry.Value.Synopsis}".Trim());
+            }
+
             UpdateEpisodeNavigationButtons();
         }
 
         void DrawEpisodeRows(MediaSeason season, int seasonIndex)
         {
             episodeRows.Children.Clear();
+            episodeButtons.Clear();
             if (season.Episodes.Count == 0)
             {
                 episodeRows.Children.Add(CreateCompactEmptyState("No episodes returned.", "Try selecting this season again later."));
@@ -230,17 +328,18 @@ public sealed partial class MainWindow
 
             foreach (var episode in season.Episodes)
             {
-                var episodeButton = CreateActionButton(
-                    $"▶  {episode.Number:00}  ·  {episode.Name}{(episode.RuntimeMinutes > 0 ? $"  ·  {episode.RuntimeMinutes} min" : string.Empty)}",
-                    () =>
-                    {
-                        SetSelectedEpisode(season, episode, seasonIndex);
-                        _ = StartSelectedPlaybackAsync();
-                    });
+                var label = $"{episode.Number:00}  ·  {episode.Name}{(episode.RuntimeMinutes > 0 ? $"  ·  {episode.RuntimeMinutes} min" : string.Empty)}";
+                var episodeButton = CreateActionButton(label, () => SetSelectedEpisode(season, episode, seasonIndex));
                 episodeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
                 episodeButton.HorizontalContentAlignment = HorizontalAlignment.Left;
-                AutomationProperties.SetHelpText(episodeButton, episode.Synopsis);
-                ToolTipService.SetToolTip(episodeButton, episode.Synopsis);
+                AutomationProperties.SetName(episodeButton, $"Select season {season.Number}, episode {episode.Number}: {episode.Name}");
+                AutomationProperties.SetHelpText(
+                    episodeButton,
+                    string.IsNullOrWhiteSpace(episode.Synopsis)
+                        ? "Select this episode, then use Play selected episode to start playback."
+                        : $"Select this episode, then use Play selected episode to start playback. {episode.Synopsis}");
+                ToolTipService.SetToolTip(episodeButton, string.IsNullOrWhiteSpace(episode.Synopsis) ? label : episode.Synopsis);
+                episodeButtons[MakeEpisodeKey(season, episode)] = (episodeButton, label, episode.Synopsis);
                 episodeRows.Children.Add(episodeButton);
             }
 
@@ -264,6 +363,7 @@ public sealed partial class MainWindow
             playButton.IsEnabled = false;
             var request = ++seasonRequestVersion;
             episodeRows.Children.Clear();
+            episodeButtons.Clear();
             episodeRows.Children.Add(CreateCompactEmptyState("Loading episodes…", "Fetching this season from the selected provider."));
             try
             {
@@ -329,9 +429,15 @@ public sealed partial class MainWindow
                 if (request == seasonRequestVersion && !detailCancellation.IsCancellationRequested)
                 {
                     episodeRows.Children.Clear();
+                    episodeButtons.Clear();
                     episodeRows.Children.Add(CreateCompactEmptyState(
                         "Episodes are unavailable.",
-                        "The provider did not return this season. You can retry by selecting it again."));
+                        "The provider could not return this season. Check your connection and retry."));
+                    var retryEpisodesButton = CreateActionButton(
+                        "Retry loading episodes",
+                        () => _ = LoadSeasonEpisodesAsync(seasonIndex),
+                        isPrimary: true);
+                    episodeRows.Children.Add(retryEpisodesButton);
                     pendingEpisodeNavigation = 0;
                     activeEpisode = null;
                     activeEpisodeKey = string.Empty;
@@ -381,6 +487,7 @@ public sealed partial class MainWindow
                 detailsFeedback.Text = string.Join("  ·  ", updatedMetadata);
                 detailsFeedback.Foreground = Brush("#AEB8C8");
                 SetDetailsStatus(string.Empty);
+                retryDetailsButton.Visibility = Visibility.Collapsed;
 
                 if (activeTitle.IsSeries)
                 {
@@ -435,11 +542,23 @@ public sealed partial class MainWindow
             {
                 if (!detailCancellation.IsCancellationRequested)
                 {
-                    SetDetailsStatus("Provider details could not be loaded. You can still try Play.", isError: true);
+                    SetDetailsStatus(
+                        activeTitle.IsSeries
+                            ? "Provider details could not be loaded. Retry to load this series and its episodes."
+                            : "Provider details could not be loaded. You can still try Play.",
+                        isError: true);
+                    retryDetailsButton.Visibility = Visibility.Visible;
                     playButton.IsEnabled = !activeTitle.IsSeries;
                 }
             }
         }
+
+        retryDetailsButton.Click += (_, _) =>
+        {
+            retryDetailsButton.Visibility = Visibility.Collapsed;
+            SetDetailsStatus("Loading details from the selected provider…");
+            _ = PopulateTitleDetailsAsync();
+        };
 
         async Task NavigateEpisodeAsync(int offset)
         {
@@ -877,6 +996,8 @@ public sealed partial class MainWindow
             _playback.ClearSource();
         };
 
+        AppRoot.SizeChanged += detailsResizeHandler;
+        UpdateResponsiveDetailsLayout(AppRoot.ActualWidth, AppRoot.ActualHeight);
         AttachPlayerHandlers();
         var dialogOperation = dialog.ShowAsync();
         var detailsLoad = PopulateAndMaybePlayAsync();
@@ -886,6 +1007,7 @@ public sealed partial class MainWindow
         }
         finally
         {
+            AppRoot.SizeChanged -= detailsResizeHandler;
             detailCancellation.Cancel();
             playbackCancellation?.Cancel();
             seasonRequestVersion++;
