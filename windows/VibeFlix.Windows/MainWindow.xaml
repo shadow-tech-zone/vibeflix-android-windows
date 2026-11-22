@@ -140,7 +140,7 @@
                     </Button>
                     <Button x:Name="HistoryNav" Tag="History" Click="NavigationButton_Click" AutomationProperties.Name="History" HorizontalContentAlignment="Stretch" Padding="12,11" Background="Transparent" BorderThickness="0" Foreground="#BAC3D1">
                         <StackPanel Orientation="Horizontal" Spacing="13" VerticalAlignment="Center">
-                            <SymbolIcon Symbol="History" Foreground="#AAB5C6" />
+                            <SymbolIcon Symbol="Clock" Foreground="#AAB5C6" />
                             <TextBlock x:Name="HistoryNavLabel" Text="History" VerticalAlignment="Center" FontSize="14" />
                         </StackPanel>
                     </Button>
