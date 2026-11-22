@@ -8,7 +8,7 @@ namespace VibeFlix.Windows.Services;
 /// </summary>
 internal static class DemoCatalog
 {
-    public static IReadOnlyList<string> Genres { get; } =
+    public static string[] Genres { get; } =
     [
         "Drama",
         "Mystery",
@@ -19,7 +19,7 @@ internal static class DemoCatalog
         "Family"
     ];
 
-    public static IReadOnlyList<CatalogTitle> Titles { get; } =
+    public static CatalogTitle[] Titles { get; } =
     [
         new CatalogTitle(
             Id: "the-glass-orbit",

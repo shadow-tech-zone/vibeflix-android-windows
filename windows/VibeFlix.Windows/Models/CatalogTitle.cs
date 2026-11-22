@@ -16,11 +16,11 @@ public sealed record CatalogTitle
         string Synopsis,
         string Language,
         string Source,
-        IReadOnlyList<string> Genres,
+        string[] Genres,
         string AccentStart,
         string AccentEnd,
         bool IsNew = false,
-        IReadOnlyList<MediaSeason>? Seasons = null)
+        MediaSeason[]? Seasons = null)
     {
         this.Id = Id;
         this.Name = Name;
@@ -31,11 +31,11 @@ public sealed record CatalogTitle
         this.Synopsis = Synopsis;
         this.Language = Language;
         this.Source = Source;
-        this.Genres = Genres;
+        this.Genres = Array.AsReadOnly(Genres);
         this.AccentStart = AccentStart;
         this.AccentEnd = AccentEnd;
         this.IsNew = IsNew;
-        this.Seasons = Seasons ?? Array.Empty<MediaSeason>();
+        this.Seasons = Array.AsReadOnly(Seasons ?? Array.Empty<MediaSeason>());
     }
 
     public string Id { get; init; }
