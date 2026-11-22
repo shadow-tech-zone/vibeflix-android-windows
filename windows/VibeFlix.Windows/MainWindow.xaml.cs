@@ -532,8 +532,8 @@ public sealed partial class MainWindow : Window
     }
 
     private IEnumerable<Button> NavigationButtons() =>
-    [HomeNav, SearchNav, MyListNav, ContinueNav, HistoryNav, SettingsNav];
+        new[] { HomeNav, SearchNav, MyListNav, ContinueNav, HistoryNav, SettingsNav };
 
     private IEnumerable<TextBlock> NavigationLabels() =>
-    [HomeNavLabel, SearchNavLabel, MyListNavLabel, ContinueNavLabel, HistoryNavLabel, SettingsNavLabel];
+        new[] { HomeNavLabel, SearchNavLabel, MyListNavLabel, ContinueNavLabel, HistoryNavLabel, SettingsNavLabel };
 }
