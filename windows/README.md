@@ -13,7 +13,7 @@ The shell is a foundation, not a port of the Android screen layouts. The Windows
 
 ## UX research gate
 
-Before polishing or expanding the visual UI, first research the current Netflix Windows client: verify what Windows product/form is currently available, then inspect its publicly observable Home, navigation, search, title-detail, library, playback, keyboard/mouse, and window-size behaviors. Record a short UX findings/design brief and translate only general interaction patterns into an original VibeFlix design. Do not copy Netflix's branding, icons, artwork, proprietary assets, or reproduce screens pixel-for-pixel. The existing shell is scaffolding, not the final design. This research and desktop design brief should come before the next major UI build-out.
+The source-based research and original VibeFlix design direction are in [`UX-RESEARCH.md`](UX-RESEARCH.md). The current US and Pakistan Microsoft Store listings identify Netflix, Inc.'s Windows product as a web-based app that auto-updates; Netflix Help says Edge must be installed and that Windows downloads are no longer supported. The current Store pages did not expose a build number or inspectable screenshots, and this workspace has no Windows desktop session, so the installed app's actual screens and resize behavior remain unverified. Before polishing or expanding the visual UI, inspect the latest Store build (or review captures from it) across Home, navigation, search/categories, title details, My List, Continue Watching, playback, keyboard/mouse, and window sizes. Then review original VibeFlix wireframes against the brief. Do not copy Netflix branding, icons, artwork, or screens pixel-for-pixel. The existing shell is scaffolding, not the final design.
 
 ## Sync behavior
 
