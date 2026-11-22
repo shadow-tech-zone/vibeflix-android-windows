@@ -21,6 +21,8 @@
 
 - Build the fresh WinUI 3/.NET app in `windows/`; do not revive the removed WPF prototype or reuse Android Media3 code.
 - Keep desktop navigation usable with both keyboard and mouse, preserve the original dark visual direction, and use the independent Windows playback stack.
+- Before expanding the visual UI, research the current Netflix Windows client and document its observable UX patterns; create an original desktop-first VibeFlix design, not a pixel-perfect clone or a stretched Android layout.
+- Preserve the core Android product workflows, but adapt their presentation for desktop. After one-time sync opt-in, sync should be automatic; do not make users repeatedly press a manual sync button.
 - Follow `windows/README.md` for local commands. The Windows Actions workflow performs the compile check because this workspace has no Windows/.NET toolchain.
 
 ## Other platforms and sync

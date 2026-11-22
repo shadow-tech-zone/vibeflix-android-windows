@@ -240,6 +240,7 @@ RLS is not a substitute for table privileges. Grant only the table/column operat
 ## 5. Sync and conflict rules
 
 - Keep local behavior available signed out/offline. The user must explicitly enable sync per account; retain local mutations and data if any request fails.
+- Desired UX after that one-time consent: automatically start an initial merge on sign-in, then sync queued/coalesced local changes on app resume, network recovery, and suitable background opportunities, with durable retries. Do not require a recurring manual “Sync now” action; expose status quietly and keep a retry action only for recovery. The current Android UI still requires “Sync library now”; this automation is not implemented yet.
 - The Android REST client reads in stable primary-key-ordered pages of 100 rows and chunks writes into 100-row batches so long-lived tombstones are not silently clipped by PostgREST row limits.
 - My List and latest-per-title History use `client_updated_at` with source-scoped title IDs and durable removal tombstones. History removal tombstones related progress; Clear all history also writes the account-wide `user_library_state.history_cleared_at` watermark so a stale offline device cannot restore rows the clearing device did not know about.
 - Progress is keyed per title/episode. Movies use `episode_key = ''`; TV keys are validated season/episode numbers only. Merge only identical keys, never send playback URLs, and derive Continue Watching from the latest incomplete local checkpoint.
@@ -275,6 +276,7 @@ The schema and Android implementation are in place, but live validation remains 
 - [ ] Add request-level RLS isolation tests with separate Auth-issued users before relying on cross-device sync.
 - [x] Add sign-in-only Auth UI/API plumbing and Android Keystore AES-GCM session storage.
 - [x] Confirm live Android sign-in and cloud writes using the installed debug build; Supabase queries also found a resumable progress checkpoint. Public signup remains disabled.
+- [ ] Replace the current manual “Sync library now” path with automatic queued/retried sync after one-time consent, sign-in, local changes, app resume, and network recovery; do not change the local-first/opt-in boundary.
 - [ ] Verify restore on a second Android installation. The user chose to defer this test and proceed with Windows; it remains unverified, not passed.
 - [x] Implement opt-in, local-first Android sync for My List, History, progress/resume, and Continue Watching visibility/tombstones. Direct live-SQL guard checks pass; the refreshed source archive passed offline unit tests and debug-package verification in [CI run 44971555380](https://github.com/shadow-tech-zone/vibeflix-android-windows/actions/runs/44971555380). Live sign-in and cloud writes were subsequently confirmed on the user's installed debug build; second-install restore and request-level isolation remain pending.
 - [x] Complete live database guard checks for future-time clamping, clear/removal watermarks, History/progress tombstones, hidden-state removal ties, later unhide after History removal, stale-state rejection, completion ties, and fixture cleanup.

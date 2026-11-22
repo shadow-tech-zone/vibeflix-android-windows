@@ -33,6 +33,8 @@ The user explicitly chose to begin Windows work and defer the second-Android-ins
 
 The new Windows project is a native WinUI 3/.NET 10 app in `windows/`, not the removed WPF experiment. Its first step is a dark, keyboard/mouse-navigable shell and an independent Windows playback-service foundation. Local compilation is unavailable in this workspace; the new Windows GitHub Actions workflow is the remote compile path.
 
+Before expanding the Windows visuals, research the currently available Netflix Windows client, document the observed UX patterns, and create an original desktop-first VibeFlix design brief. Preserve Android's core workflows, but do not transplant its phone layouts or copy Netflix screens/assets. Sync should require a one-time explicit opt-in and then run automatically after sign-in and on app resume, local changes, and network recovery, with queued/retried writes and no repeated manual “Sync now” step. The current Android UI still requires a manual sync action; automatic background syncing remains future work, not a completed feature.
+
 ## Verification posture
 
 Automated checks cover compilation, offline unit tests, signing verification, and package metadata. Live provider responses, stream playback, real-device behavior, and Play Protect status are not proven by those checks. Distinguish user-reported device success from CI verification in all communication.
