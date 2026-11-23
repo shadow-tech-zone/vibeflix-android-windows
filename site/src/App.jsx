@@ -1,31 +1,162 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
 
+const RED = "#e50914";
+const INK = "#080808";
+const PAPER = "#f5f2ef";
+const MUTED = "#aaa6a2";
 const REPOSITORY_URL =
   "https://github.com/shadow-tech-zone/vibeflix-android-windows";
+const STORAGE_KEY = "vibeflix-private-prototype-my-list";
 
-const palette = {
-  ink: "#080808",
-  surface: "#111112",
-  surfaceRaised: "#181819",
-  paper: "#f4f1ed",
-  muted: "#a6a2a0",
-  faint: "#6e6a68",
-  red: "#e50914",
-  redDark: "#9f1018",
-  line: "#292728",
-};
+const CATALOG = [
+  {
+    id: "quiet-hour",
+    title: "The Quiet Hour",
+    type: "Series",
+    year: "2026",
+    maturity: "16+",
+    length: "2 seasons",
+    genre: ["Mystery", "Drama"],
+    art: "/art/spotlight-night.svg",
+    cardArt: "/art/card-hollow.svg",
+    progress: 64,
+    episode: "S2:E4 · The Long Way Home",
+    match: "98% match",
+    synopsis:
+      "A late-night radio host begins receiving calls from a town that disappeared from every map. Each voice knows what happens next—except for her.",
+  },
+  {
+    id: "blue-hour",
+    title: "Blue Hour",
+    type: "Film",
+    year: "2025",
+    maturity: "13+",
+    length: "1h 48m",
+    genre: ["Drama", "City stories"],
+    art: "/art/card-blue-hour.svg",
+    cardArt: "/art/card-blue-hour.svg",
+    progress: 31,
+    episode: "Paused at 42 min",
+    match: "94% match",
+    synopsis:
+      "Two strangers miss the last train home and spend one changing night learning how much a city can keep to itself.",
+  },
+  {
+    id: "orbit-house",
+    title: "Orbit House",
+    type: "Series",
+    year: "2026",
+    maturity: "13+",
+    length: "1 season",
+    genre: ["Science fiction", "Mystery"],
+    art: "/art/card-orbit.svg",
+    cardArt: "/art/card-orbit.svg",
+    progress: 0,
+    episode: "6 episodes",
+    match: "96% match",
+    synopsis:
+      "A small research crew keeps a station running at the quiet edge of a crowded solar system. Then the station starts answering questions nobody asked.",
+  },
+  {
+    id: "embers-on-the-ridge",
+    title: "Embers on the Ridge",
+    type: "Film",
+    year: "2024",
+    maturity: "16+",
+    length: "2h 02m",
+    genre: ["Adventure", "Drama"],
+    art: "/art/card-embers.svg",
+    cardArt: "/art/card-embers.svg",
+    progress: 0,
+    episode: "2h 02m",
+    match: "91% match",
+    synopsis:
+      "After a mountain observatory loses contact with the valley, a cartographer returns to the trail she swore she had left behind.",
+  },
+  {
+    id: "river-of-glass",
+    title: "River of Glass",
+    type: "Series",
+    year: "2025",
+    maturity: "13+",
+    length: "3 seasons",
+    genre: ["Adventure", "Mystery"],
+    art: "/art/card-river.svg",
+    cardArt: "/art/card-river.svg",
+    progress: 82,
+    episode: "S1:E7 · The Crossing",
+    match: "97% match",
+    synopsis:
+      "A field researcher follows an impossible river through a landscape that seems to remember everyone who passes through it.",
+  },
+  {
+    id: "northbound",
+    title: "Northbound",
+    type: "Film",
+    year: "2025",
+    maturity: "13+",
+    length: "1h 56m",
+    genre: ["Adventure", "Drama"],
+    art: "/art/card-north.svg",
+    cardArt: "/art/card-north.svg",
+    progress: 0,
+    episode: "1h 56m",
+    match: "93% match",
+    synopsis:
+      "A winter rail line is about to close for good. A conductor and one remaining passenger take the long route through the mountains.",
+  },
+  {
+    id: "signal-lost",
+    title: "Signal Lost",
+    type: "Series",
+    year: "2024",
+    maturity: "16+",
+    length: "2 seasons",
+    genre: ["Thriller", "Science fiction"],
+    art: "/art/card-signal.svg",
+    cardArt: "/art/card-signal.svg",
+    progress: 0,
+    episode: "8 episodes",
+    match: "95% match",
+    synopsis:
+      "A night-shift engineer discovers a second pattern hidden inside the city’s emergency broadcast. It only appears when every other channel goes quiet.",
+  },
+  {
+    id: "hollow-sun",
+    title: "A Hollow Sun",
+    type: "Film",
+    year: "2023",
+    maturity: "16+",
+    length: "1h 42m",
+    genre: ["Mystery", "Drama"],
+    art: "/art/card-hollow.svg",
+    cardArt: "/art/card-hollow.svg",
+    progress: 0,
+    episode: "1h 42m",
+    match: "89% match",
+    synopsis:
+      "A photographer returns to her childhood observatory and finds the lens still pointed at a light that should have faded decades ago.",
+  },
+];
 
-function jumpTo(id) {
-  if (typeof document !== "undefined") {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+function readSavedIds() {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
+    return Array.isArray(saved) ? saved.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
   }
 }
 
@@ -35,1596 +166,794 @@ function openRepository() {
   }
 }
 
-function Brand({ compact = false }) {
+function Brand() {
   return (
     <View style={styles.brand} accessibilityRole="header">
       <View style={styles.brandMark}>
         <Text style={styles.brandMarkText}>V</Text>
       </View>
-      <Text style={[styles.brandName, compact && styles.brandNameCompact]}>
-        VIBEFLIX
-      </Text>
+      <Text style={styles.brandWord}>VIBEFLIX</Text>
     </View>
   );
 }
 
-function NavAction({ children, target, quiet = false }) {
-  const onPress = target === "source" ? openRepository : () => jumpTo(target);
+function Header({
+  activeTab,
+  onTabChange,
+  compact,
+  searchOpen,
+  onSearchToggle,
+  query,
+  onQueryChange,
+}) {
+  const tabs = ["Home", "Series", "Films", "My List"];
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <View style={[styles.header, compact && styles.headerCompact]}>
+      <View style={styles.headerLeft}>
+        <Brand />
+        {!compact && (
+          <View style={styles.navItems}>
+            {tabs.map((tab) => (
+              <Pressable
+                key={tab}
+                accessibilityRole="button"
+                onPress={() => onTabChange(tab)}
+                style={styles.navPressable}
+              >
+                <Text
+                  style={[
+                    styles.navText,
+                    activeTab === tab && styles.navTextActive,
+                  ]}
+                >
+                  {tab}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={[styles.headerRight, compact && styles.headerRightCompact]}>
+        {searchOpen && (
+          <View style={[styles.searchBox, compact && styles.searchBoxCompact]}>
+            <Text style={styles.searchGlyph}>⌕</Text>
+            <TextInput
+              accessibilityLabel="Search titles"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={onQueryChange}
+              placeholder="Titles, genres"
+              placeholderTextColor="#9d9996"
+              style={styles.searchInput}
+              value={query}
+            />
+            {query.length > 0 && (
+              <Pressable accessibilityRole="button" onPress={() => onQueryChange("")}>
+                <Text style={styles.searchClear}>×</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+        <Pressable
+          accessibilityLabel={searchOpen ? "Close search" : "Search"}
+          accessibilityRole="button"
+          onPress={onSearchToggle}
+          style={[styles.headerIconButton, compact && styles.headerIconButtonCompact]}
+        >
+          <Text style={styles.searchIcon}>{searchOpen ? "×" : "⌕"}</Text>
+        </Pressable>
+        {compact && !searchOpen ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setMobileMenuOpen((open) => !open)}
+            style={styles.mobileMenuButton}
+          >
+            <Text style={styles.mobileMenuText}>{mobileMenuOpen ? "CLOSE" : "BROWSE"}</Text>
+          </Pressable>
+        ) : !compact ? (
+          <Text style={styles.kidsLink}>KIDS</Text>
+        ) : null}
+        {(!compact || !searchOpen) && (
+          <Pressable
+            accessibilityLabel="Profile: Sam"
+            accessibilityRole="button"
+            style={styles.avatarButton}
+          >
+            <Text style={styles.avatarText}>S</Text>
+          </Pressable>
+        )}
+      </View>
+      {compact && mobileMenuOpen && (
+        <View style={styles.mobileMenu}>
+          {tabs.map((tab) => (
+            <Pressable
+              key={tab}
+              accessibilityRole="button"
+              onPress={() => {
+                onTabChange(tab);
+                setMobileMenuOpen(false);
+              }}
+              style={styles.mobileMenuItem}
+            >
+              <Text
+                style={[
+                  styles.mobileMenuItemText,
+                  activeTab === tab && styles.navTextActive,
+                ]}
+              >
+                {tab}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function SolidButton({ children, onPress, quiet = false, icon }) {
   return (
     <Pressable
-      accessibilityRole="link"
+      accessibilityRole="button"
       onPress={onPress}
-      style={[styles.navAction, quiet && styles.navActionQuiet]}
+      style={({ hovered, pressed }) => [
+        styles.solidButton,
+        quiet && styles.solidButtonQuiet,
+        hovered && !quiet && styles.solidButtonHover,
+        pressed && styles.solidButtonPressed,
+      ]}
     >
-      <Text style={[styles.navActionText, quiet && styles.navActionTextQuiet]}>
+      {icon && <Text style={[styles.solidButtonIcon, quiet && styles.quietIcon]}>{icon}</Text>}
+      <Text style={[styles.solidButtonText, quiet && styles.solidButtonTextQuiet]}>
         {children}
       </Text>
     </Pressable>
   );
 }
 
-function ActionButton({ children, target, secondary = false }) {
-  const onPress = target === "source" ? openRepository : () => jumpTo(target);
+function Hero({ item, compact, onPlay, onMoreInfo }) {
   return (
-    <Pressable
-      accessibilityRole="link"
-      onPress={onPress}
-      style={[styles.actionButton, secondary && styles.actionButtonSecondary]}
-    >
-      <Text
-        style={[
-          styles.actionButtonText,
-          secondary && styles.actionButtonTextSecondary,
-        ]}
-      >
-        {children}
-      </Text>
-      <Text
-        style={[
-          styles.actionArrow,
-          secondary && styles.actionArrowSecondary,
-        ]}
-      >
-        {secondary ? "↗" : "→"}
-      </Text>
-    </Pressable>
-  );
-}
-
-function ArtCard({ title, index, style }) {
-  const variants = [
-    {
-      backgroundColor: "#26212a",
-      glow: "#c44857",
-      sky: "#f07c5c",
-      ridge: "#483445",
-      foreground: "#1b1a25",
-    },
-    {
-      backgroundColor: "#10232a",
-      glow: "#bd5e49",
-      sky: "#e8a267",
-      ridge: "#28434a",
-      foreground: "#111a21",
-    },
-    {
-      backgroundColor: "#252025",
-      glow: "#b7423c",
-      sky: "#e4a45f",
-      ridge: "#4e3538",
-      foreground: "#1a191e",
-    },
-    {
-      backgroundColor: "#171f2b",
-      glow: "#72677e",
-      sky: "#dd8270",
-      ridge: "#33404c",
-      foreground: "#111821",
-    },
-  ];
-  const color = variants[index % variants.length];
-
-  return (
-    <View style={[styles.artCard, { backgroundColor: color.backgroundColor }, style]}>
-      <View
-        style={[
-          styles.artGlow,
-          { backgroundColor: color.glow, shadowColor: color.glow },
-        ]}
+    <View style={[styles.heroStage, compact && styles.heroStageCompact]}>
+      <Image
+        accessibilityLabel="Original illustrated night landscape for The Quiet Hour"
+        resizeMode="cover"
+        source={{ uri: "/art/spotlight-night.svg" }}
+        style={styles.heroArtwork}
       />
-      <View style={[styles.artSun, { backgroundColor: color.sky }]} />
-      <View style={[styles.artRidgeBack, { backgroundColor: color.ridge }]} />
-      <View style={[styles.artRidgeFront, { backgroundColor: color.foreground }]} />
-      <View style={styles.artCardCopy}>
-        <Text style={styles.artEyebrow}>A STORY IN YOUR LIST</Text>
-        <Text style={styles.artTitle}>{title}</Text>
+      <View style={styles.heroAtmosphere} />
+      <View style={styles.heroLeftShade} />
+      <View style={styles.heroBottomShade} />
+      <Header {...item.headerProps} compact={compact} />
+
+      <View style={[styles.heroContent, compact && styles.heroContentCompact]}>
+        <View style={styles.spotlightLabel}>
+          <View style={styles.spotlightMark}>
+            <Text style={styles.spotlightMarkText}>V</Text>
+          </View>
+          <Text style={styles.spotlightText}>VIBEFLIX SPOTLIGHT</Text>
+        </View>
+        <Text accessibilityRole="header" style={[styles.heroTitle, compact && styles.heroTitleCompact]}>
+          {item.title}
+        </Text>
+        <View style={styles.heroMetadata}>
+          <Text style={styles.matchText}>{item.match}</Text>
+          <Text style={styles.metadataDot}>•</Text>
+          <Text style={styles.heroMetaText}>{item.year}</Text>
+          <Text style={styles.metadataDot}>•</Text>
+          <Text style={styles.heroMetaText}>{item.maturity}</Text>
+          <Text style={styles.metadataDot}>•</Text>
+          <Text style={styles.heroMetaText}>{item.length}</Text>
+        </View>
+        <Text style={[styles.heroSynopsis, compact && styles.heroSynopsisCompact]}>
+          {item.synopsis}
+        </Text>
+        <View style={styles.heroActions}>
+          <SolidButton icon="▶" onPress={() => onPlay(item)}>Play</SolidButton>
+          <SolidButton icon="ⓘ" onPress={() => onMoreInfo(item)} quiet>
+            More info
+          </SolidButton>
+        </View>
+        <Text style={styles.heroGenre}>{item.genre.join("  ·  ")}</Text>
       </View>
-      <View style={styles.artIndex}>
-        <Text style={styles.artIndexText}>{String(index + 1).padStart(2, "0")}</Text>
+
+      <View style={styles.heroSideNote}>
+        <View style={styles.heroSideRule} />
+        <Text style={styles.heroSideText}>A STORY FOR AFTER DARK</Text>
+      </View>
+      <View style={styles.heroAgeBadge}>
+        <Text style={styles.heroAgeText}>16+</Text>
       </View>
     </View>
   );
 }
 
-function PhonePreview({ compact }) {
+function TitleCard({ item, onSelect, compact }) {
   return (
-    <View style={[styles.previewWrap, compact && styles.previewWrapCompact]}>
-      <View style={styles.previewHalo} />
-      <View style={styles.deviceFrame}>
-        <View style={styles.deviceTop}>
-          <View style={styles.deviceNotch} />
-          <View style={styles.deviceStatus}>
-            <Text style={styles.deviceTime}>9:41</Text>
-            <Text style={styles.deviceSignal}>●  ◖  ▰</Text>
-          </View>
+    <Pressable
+      accessibilityLabel={`${item.title}, ${item.type}, ${item.match}`}
+      accessibilityRole="button"
+      onPress={() => onSelect(item)}
+      style={({ hovered, pressed }) => [
+        styles.titleCard,
+        compact && styles.titleCardCompact,
+        hovered && styles.titleCardHover,
+        pressed && styles.titleCardPressed,
+      ]}
+    >
+      <View style={styles.cardArtworkWrap}>
+        <Image
+          accessibilityIgnoresInvertColors
+          accessibilityLabel={`Original fictional artwork for ${item.title}`}
+          resizeMode="cover"
+          source={{ uri: item.cardArt }}
+          style={styles.cardArtwork}
+        />
+        <View style={styles.cardArtworkShade} />
+        <View style={styles.cardTopLine}>
+          <Text style={styles.cardType}>{item.type.toUpperCase()}</Text>
+          <Text style={styles.cardMatch}>{item.match}</Text>
         </View>
-
-        <View style={styles.appHeader}>
-          <Brand compact />
-          <View style={styles.profileDot}>
-            <Text style={styles.profileDotText}>S</Text>
-          </View>
+        <View style={styles.cardPlayDot}>
+          <Text style={styles.cardPlayIcon}>▶</Text>
         </View>
+        {item.progress > 0 && (
+          <View style={styles.cardProgressTrack}>
+            <View style={[styles.cardProgressFill, { width: `${item.progress}%` }]} />
+          </View>
+        )}
+      </View>
+      <View style={styles.cardCopy}>
+        <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
+        <Text numberOfLines={1} style={styles.cardSubline}>
+          {item.progress > 0 ? item.episode : `${item.year}  ·  ${item.genre[0]}`}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
 
-        <View style={styles.continueCard}>
-          <ArtCard title="THE QUIET HOUR" index={0} style={styles.previewArt} />
-          <View style={styles.continueScrim} />
-          <View style={styles.continueCopy}>
-            <Text style={styles.continueEyebrow}>CONTINUE WATCHING</Text>
-            <Text style={styles.continueTitle}>The Quiet Hour</Text>
-            <Text style={styles.continueMeta}>Season 02 · Episode 04</Text>
-            <View style={styles.progressTrack}>
-              <View style={styles.progressFill} />
+function ContentRow({ title, note, items, compact, onSelect }) {
+  const scroller = useRef(null);
+  if (!items.length) return null;
+  return (
+    <View style={styles.rowSection}>
+      <View style={styles.rowHeading}>
+        <View style={styles.rowTitleGroup}>
+          <Text accessibilityRole="header" style={[styles.rowTitle, compact && styles.rowTitleCompact]}>
+            {title}
+          </Text>
+          {note && <Text style={styles.rowNote}>{note}</Text>}
+        </View>
+        <Pressable
+          accessibilityLabel={`Explore more: ${title}`}
+          accessibilityRole="button"
+          onPress={() => scroller.current?.scrollToEnd({ animated: true })}
+          style={styles.rowMore}
+        >
+          <Text style={styles.rowMoreText}>EXPLORE</Text>
+          <Text style={styles.rowMoreArrow}>›</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        ref={scroller}
+        contentContainerStyle={[styles.rowScroller, compact && styles.rowScrollerCompact]}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {items.map((item) => (
+          <TitleCard key={item.id} item={item} onSelect={onSelect} compact={compact} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function DetailModal({ item, saved, onClose, onPlay, onToggleSaved }) {
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={Boolean(item)}
+    >
+      {item && (
+        <View style={styles.modalBackdrop}>
+          <Pressable accessibilityLabel="Close details" onPress={onClose} style={styles.modalDismiss} />
+          <View style={styles.detailSheet}>
+            <View style={styles.detailArtworkWrap}>
+              <Image
+                accessibilityLabel={`Original fictional artwork for ${item.title}`}
+                resizeMode="cover"
+                source={{ uri: item.art }}
+                style={styles.detailArtwork}
+              />
+              <View style={styles.detailArtworkFade} />
+              <Pressable accessibilityLabel="Close details" onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>×</Text>
+              </Pressable>
             </View>
-            <Text style={styles.continueTime}>18 min left</Text>
-          </View>
-          <View style={styles.playButton}>
-            <Text style={styles.playGlyph}>▶</Text>
+            <ScrollView contentContainerStyle={styles.detailContent}>
+              <Text style={styles.detailKicker}>VIBEFLIX · FICTIONAL DEMO TITLE</Text>
+              <Text accessibilityRole="header" style={styles.detailTitle}>{item.title}</Text>
+              <View style={styles.detailMetadata}>
+                <Text style={styles.matchText}>{item.match}</Text>
+                <Text style={styles.metadataDot}>•</Text>
+                <Text style={styles.detailMetaText}>{item.year}</Text>
+                <Text style={styles.metadataDot}>•</Text>
+                <Text style={styles.detailMetaText}>{item.maturity}</Text>
+                <Text style={styles.metadataDot}>•</Text>
+                <Text style={styles.detailMetaText}>{item.length}</Text>
+              </View>
+              <Text style={styles.detailSynopsis}>{item.synopsis}</Text>
+              <Text style={styles.detailGenres}>
+                <Text style={styles.detailGenreLabel}>Genres: </Text>
+                {item.genre.join(", ")}
+              </Text>
+              <View style={styles.detailActions}>
+                <SolidButton icon="▶" onPress={() => onPlay(item)}>Play</SolidButton>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => onToggleSaved(item.id)}
+                  style={styles.listButton}
+                >
+                  <Text style={styles.listButtonIcon}>{saved ? "✓" : "+"}</Text>
+                  <Text style={styles.listButtonText}>{saved ? "In My List" : "My List"}</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.detailDisclaimer}>
+                This private prototype uses fictional sample titles and original artwork. No streaming source is connected.
+              </Text>
+            </ScrollView>
           </View>
         </View>
-
-        <View style={styles.previewShelfHeader}>
-          <Text style={styles.previewShelfTitle}>Your list</Text>
-          <Text style={styles.previewShelfMore}>SEE ALL</Text>
-        </View>
-        <View style={styles.previewShelf}>
-          <ArtCard title="Afterglow" index={1} style={styles.shelfArt} />
-          <ArtCard title="Low Tide" index={2} style={styles.shelfArt} />
-          <ArtCard title="Northbound" index={3} style={styles.shelfArt} />
-        </View>
-        <View style={styles.previewTabBar}>
-          <View style={styles.tabItem}>
-            <View style={[styles.tabGlyph, styles.tabGlyphActive]} />
-            <Text style={styles.tabLabelActive}>Home</Text>
-          </View>
-          <View style={styles.tabItem}>
-            <View style={styles.tabGlyph} />
-            <Text style={styles.tabLabel}>Search</Text>
-          </View>
-          <View style={styles.tabItem}>
-            <View style={styles.tabGlyph} />
-            <Text style={styles.tabLabel}>My list</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.previewCaption}>
-        <View style={styles.captionRule} />
-        <Text style={styles.captionText}>A glimpse of the mobile experience</Text>
-      </View>
-    </View>
+      )}
+    </Modal>
   );
 }
 
-function FeatureItem({ number, title, body, compact }) {
+function PlayerModal({ item, visible, onClose }) {
   return (
-    <View style={[styles.featureItem, compact && styles.featureItemCompact]}>
-      <Text style={styles.featureNumber}>{number}</Text>
-      <View style={[styles.featureCopy, compact && styles.featureCopyCompact]}>
-        <Text style={styles.featureTitle}>{title}</Text>
-        <Text style={styles.featureBody}>{body}</Text>
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+      <View style={styles.playerBackdrop}>
+        <Image
+          accessibilityLabel="Original fictional artwork"
+          resizeMode="cover"
+          source={{ uri: item?.art || "/art/spotlight-night.svg" }}
+          style={styles.playerArtwork}
+        />
+        <View style={styles.playerShade} />
+        <Pressable accessibilityLabel="Close preview" onPress={onClose} style={styles.closeButtonPlayer}>
+          <Text style={styles.closeButtonText}>×</Text>
+        </Pressable>
+        <View style={styles.playerMessage}>
+          <View style={styles.playerIconCircle}>
+            <Text style={styles.playerIcon}>▶</Text>
+          </View>
+          <Text style={styles.playerTitle}>{item?.title || "VibeFlix"}</Text>
+          <Text style={styles.playerBody}>
+            Playback isn’t connected in this private UI experiment. This screen is a visual prototype only.
+          </Text>
+        </View>
+        <Text style={styles.playerPrototypeLabel}>PRIVATE PROTOTYPE · NO STREAM SOURCE CONNECTED</Text>
       </View>
-    </View>
+    </Modal>
   );
 }
 
-function SourcePill({ children, active = false }) {
+function EmptyState({ onExplore }) {
   return (
-    <View style={[styles.sourcePill, active && styles.sourcePillActive]}>
-      <View style={[styles.sourceDot, active && styles.sourceDotActive]} />
-      <Text style={[styles.sourcePillText, active && styles.sourcePillTextActive]}>
-        {children}
+    <View style={styles.emptyState}>
+      <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>+</Text></View>
+      <Text accessibilityRole="header" style={styles.emptyTitle}>Your list is waiting.</Text>
+      <Text style={styles.emptyBody}>
+        Save a title and it’ll be here when you want it. Your list is stored in this browser for the prototype.
       </Text>
+      <Pressable accessibilityRole="button" onPress={onExplore} style={styles.emptyButton}>
+        <Text style={styles.emptyButtonText}>BROWSE TITLES</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function Footer() {
+  return (
+    <View style={styles.footer}>
+      <View style={styles.footerTop}>
+        <Brand />
+        <Text style={styles.footerLabel}>PRIVATE HOBBY PROTOTYPE</Text>
+      </View>
+      <Text style={styles.footerText}>
+        VibeFlix is an independent personal project. This UI uses fictional demo titles and original illustrations; it is not affiliated with Netflix or any content provider. No media playback or provider service is connected.
+      </Text>
+      <View style={styles.footerBottom}>
+        <Text style={styles.footerSmall}>© 2026 VIBEFLIX · PERSONAL USE</Text>
+        <Pressable accessibilityRole="link" onPress={openRepository}>
+          <Text style={styles.footerLink}>PROJECT SOURCE ↗</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 export default function App() {
   const { width } = useWindowDimensions();
-  const compact = width < 820;
-  const narrow = width < 520;
+  const compact = width < 760;
+  const [activeTab, setActiveTab] = useState("Home");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [savedIds, setSavedIds] = useState(readSavedIds);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [playingItem, setPlayingItem] = useState(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(savedIds));
+    } catch {
+      // Local persistence is optional; the prototype still works without browser storage.
+    }
+  }, [savedIds]);
+
+  const saved = useMemo(() => new Set(savedIds), [savedIds]);
+  const visibleItems = useMemo(() => {
+    let items = CATALOG;
+    if (activeTab === "Series") items = items.filter((item) => item.type === "Series");
+    if (activeTab === "Films") items = items.filter((item) => item.type === "Film");
+    if (activeTab === "My List") items = items.filter((item) => saved.has(item.id));
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery) {
+      items = items.filter((item) =>
+        [item.title, item.synopsis, item.type, ...item.genre]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      );
+    }
+    return items;
+  }, [activeTab, query, saved]);
+
+  const isHome = activeTab === "Home" && query.trim().length === 0;
+  const heroItem = CATALOG[0];
+  const rowSections = useMemo(() => {
+    if (query.trim()) {
+      return [{ title: `Search results for “${query.trim()}”`, note: "FICTIONAL SAMPLE CATALOG", items: visibleItems }];
+    }
+    if (activeTab === "My List") {
+      return [{ title: "My List", note: `${visibleItems.length} SAVED`, items: visibleItems }];
+    }
+    if (activeTab !== "Home") {
+      return [{ title: activeTab === "Series" ? "Series" : "Films", note: "CHOOSE SOMETHING TO WATCH", items: visibleItems }];
+    }
+    return [
+      {
+        title: "Continue watching",
+        note: "PICK UP WHERE YOU LEFT OFF",
+        items: CATALOG.filter((item) => item.progress > 0),
+      },
+      {
+        title: "A little mystery",
+        note: "NEW STORIES TO DISCOVER",
+        items: CATALOG.filter((item) => item.genre.includes("Mystery") || item.genre.includes("Thriller")),
+      },
+      {
+        title: "Other worlds, close by",
+        note: "A CHANGE OF SCENERY",
+        items: CATALOG.filter((item) => item.genre.includes("Science fiction") || item.genre.includes("Adventure")),
+      },
+      {
+        title: "Films for later",
+        note: "SAVE A PLACE FOR TONIGHT",
+        items: CATALOG.filter((item) => item.type === "Film"),
+      },
+    ];
+  }, [activeTab, query, visibleItems]);
+
+  const toggleSaved = (id) => {
+    setSavedIds((ids) => ids.includes(id) ? ids.filter((savedId) => savedId !== id) : [...ids, id]);
+  };
+
+  const startPreview = (item) => {
+    setSelectedItem(null);
+    setPlayingItem(item);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQuery("");
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab !== "Home") {
+      setSearchOpen(false);
+      setQuery("");
+    }
+  };
+
+  const handleSearchToggle = () => {
+    if (searchOpen) {
+      setSearchOpen(false);
+      setQuery("");
+    } else {
+      setSearchOpen(true);
+    }
+  };
 
   return (
     <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.page}
+      style={styles.appRoot}
+      contentContainerStyle={styles.pageContent}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.topGlow} />
-      <View style={[styles.nav, compact && styles.navCompact]}>
-        <Brand />
-        <View style={styles.navRight}>
-          {!narrow && <NavAction target="features">THE APP</NavAction>}
-          {!narrow && <NavAction target="privacy" quiet>YOUR LIBRARY</NavAction>}
-          <NavAction target="source" quiet>VIEW SOURCE ↗</NavAction>
-        </View>
-      </View>
-
-      <View style={[styles.hero, compact && styles.heroCompact]}>
-        <View style={[styles.heroCopy, compact && styles.heroCopyCompact]}>
-          <View style={styles.eyebrowRow}>
-            <View style={styles.liveDot} />
-            <Text style={styles.eyebrow}>MADE FOR YOUR MOBILE LIBRARY</Text>
-          </View>
-          <Text accessibilityRole="header" style={[styles.heroTitle, compact && styles.heroTitleCompact]}>
-            Your stories.
-            <Text style={styles.heroTitleAccent}> Your space.</Text>
-          </Text>
-          <Text style={[styles.heroBody, compact && styles.heroBodyCompact]}>
-            A personal media library for the things you watch, the shows you save,
-            and the exact moment you paused.
-          </Text>
-          <View style={styles.heroActions}>
-            <ActionButton target="features">TAKE A LOOK</ActionButton>
-            <ActionButton target="source" secondary>VIEW THE SOURCE</ActionButton>
-          </View>
-          <View style={styles.heroFootnote}>
-            <Text style={styles.heroFootnoteMark}>01</Text>
-            <Text style={styles.heroFootnoteText}>
-              AN ANDROID APP · BUILT AROUND YOUR QUEUE
-            </Text>
-          </View>
-        </View>
-        <PhonePreview compact={compact} />
-      </View>
-
-      <View style={styles.signalBar}>
-        <View style={[styles.signalInner, compact && styles.signalInnerCompact]}>
-          <View style={styles.signalIntro}>
-            <Text style={styles.signalLabel}>THE VIBEFLIX IDEA</Text>
-            <Text style={styles.signalStatement}>
-              Less hunting. More picking up where you left off.
-            </Text>
-          </View>
-          <View style={styles.signalDivider} />
-          <View style={styles.signalStat}>
-            <Text style={styles.signalStatValue}>3</Text>
-            <Text style={styles.signalStatLabel}>ways to browse</Text>
-          </View>
-          <View style={styles.signalStat}>
-            <Text style={styles.signalStatValue}>1</Text>
-            <Text style={styles.signalStatLabel}>place for your list</Text>
-          </View>
-        </View>
-      </View>
-
-      <View id="features" style={[styles.section, compact && styles.sectionCompact]}>
-        <View style={[styles.sectionHeading, compact && styles.sectionHeadingCompact]}>
-          <View style={styles.sectionHeadingCopy}>
-            <Text style={styles.sectionKicker}>SMALL DETAILS. BETTER FLOW.</Text>
-            <Text accessibilityRole="header" style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>
-              A library that remembers the little things.
-            </Text>
-          </View>
-          <Text style={[styles.sectionAside, compact && styles.sectionAsideCompact]}>
-            Built for the phone in your hand—not a big-screen account dashboard.
-          </Text>
-        </View>
-
-        <View style={[styles.featureGrid, compact && styles.featureGridCompact]}>
-          <FeatureItem
-            number="01"
-            title="Pick up right there"
-            body="Keep your place in a film or episode, then jump back in without searching through the whole title again."
+      {isHome ? (
+        <Hero
+          compact={compact}
+          item={{ ...heroItem, headerProps: {
+            activeTab,
+            onTabChange: handleTabChange,
+            searchOpen,
+            onSearchToggle: handleSearchToggle,
+            query,
+            onQueryChange: setQuery,
+          } }}
+          onMoreInfo={setSelectedItem}
+          onPlay={startPreview}
+        />
+      ) : (
+        <View style={[styles.catalogHeader, compact && styles.catalogHeaderCompact]}>
+          <Header
+            activeTab={activeTab}
             compact={compact}
+            onTabChange={handleTabChange}
+            onQueryChange={setQuery}
+            onSearchToggle={handleSearchToggle}
+            query={query}
+            searchOpen={searchOpen}
           />
-          <FeatureItem
-            number="02"
-            title="Your list stays yours"
-            body="Save titles to My List and keep a simple watch history. Your local library still works while signed out."
-            compact={compact}
-          />
-          <FeatureItem
-            number="03"
-            title="Built for the next episode"
-            body="Browse seasons, open the current episode list, and move on when you’re ready for what’s next."
-            compact={compact}
-          />
-        </View>
-      </View>
-
-      <View style={[styles.collectionSection, compact && styles.collectionSectionCompact]}>
-        <View style={[styles.collectionCopy, compact && styles.collectionCopyCompact]}>
-          <Text style={styles.sectionKicker}>YOUR SHELVES, NOT A FEED</Text>
-          <Text accessibilityRole="header" style={[styles.collectionTitle, compact && styles.collectionTitleCompact]}>
-            Keep the queue. Lose the clutter.
-          </Text>
-          <Text style={styles.collectionBody}>
-            My List, Continue Watching, and History each have a clear job. No
-            social feed, no public profile, no pressure to keep up.
-          </Text>
-          <View style={styles.collectionRule} />
-          <View style={styles.collectionNote}>
-            <Text style={styles.collectionNoteMark}>↳</Text>
-            <Text style={styles.collectionNoteText}>
-              Resume is tracked per title—and per episode for series.
+          <View style={styles.catalogIntro}>
+            <Text style={styles.catalogKicker}>VIBEFLIX · PRIVATE PROTOTYPE</Text>
+            <Text accessibilityRole="header" style={[styles.catalogTitle, compact && styles.catalogTitleCompact]}>
+              {query.trim() ? "Search" : activeTab === "My List" ? "My List" : `Explore ${activeTab.toLowerCase()}`}
+            </Text>
+            <Text style={styles.catalogSubcopy}>
+              A fictional sample catalog for the VibeFlix UI experiment.
             </Text>
           </View>
         </View>
-        <View style={[styles.collectionArt, compact && styles.collectionArtCompact]}>
-          <View style={styles.collectionArtHeader}>
-            <Text style={styles.collectionArtLabel}>A LITTLE ORDER</Text>
-            <Text style={styles.collectionArtCount}>01 — 04</Text>
-          </View>
-          <View style={[styles.artRow, narrow && styles.artRowNarrow]}>
-            <ArtCard title="Afterglow" index={0} style={styles.collectionPoster} />
-            <ArtCard title="Low Tide" index={1} style={styles.collectionPoster} />
-            {!narrow && <ArtCard title="Northbound" index={2} style={styles.collectionPoster} />}
-            {!narrow && <ArtCard title="Slow Orbit" index={3} style={styles.collectionPoster} />}
-          </View>
-          <View style={styles.collectionArtFooter}>
-            <View style={styles.collectionArtFooterLine} />
-            <Text style={styles.collectionArtFooterText}>ILLUSTRATIVE UI · FICTIONAL TITLES</Text>
-          </View>
-        </View>
-      </View>
+      )}
 
-      <View id="privacy" style={[styles.privacySection, compact && styles.privacySectionCompact]}>
-        <View style={styles.privacyMark}>
-          <View style={styles.privacyMarkOuter} />
-          <View style={styles.privacyMarkInner} />
-          <View style={styles.privacyMarkCore} />
-        </View>
-        <View style={[styles.privacyCopy, compact && styles.privacyCopyCompact]}>
-          <Text style={styles.sectionKicker}>LOCAL FIRST, BY DEFAULT</Text>
-          <Text accessibilityRole="header" style={[styles.privacyTitle, compact && styles.privacyTitleCompact]}>
-            Your watch history is personal. It should stay that way.
-          </Text>
-          <Text style={styles.privacyBody}>
-            Library sync is optional and requires your consent. The app keeps
-            working locally; synced library data does not include playback links
-            or provider credentials.
-          </Text>
-          <View style={styles.privacyFoot}>
-            <View style={styles.privacyCheck}>
-              <Text style={styles.privacyCheckText}>✓</Text>
+      {activeTab === "My List" && visibleItems.length === 0 ? (
+        <EmptyState onExplore={() => handleTabChange("Home")} />
+      ) : (
+        <View style={[styles.rowsWrap, compact && styles.rowsWrapCompact]}>
+          {rowSections.map((row) => (
+            <ContentRow
+              key={`${activeTab}-${row.title}`}
+              compact={compact}
+              items={row.items}
+              note={row.note}
+              onSelect={setSelectedItem}
+              title={row.title}
+            />
+          ))}
+          {visibleItems.length === 0 && query.trim() && (
+            <View style={styles.noResults}>
+              <Text style={styles.noResultsTitle}>No matches this time.</Text>
+              <Text style={styles.noResultsBody}>Try a title, genre, or a different search.</Text>
+              <Pressable accessibilityRole="button" onPress={closeSearch} style={styles.clearSearchButton}>
+                <Text style={styles.clearSearchText}>CLEAR SEARCH</Text>
+              </Pressable>
             </View>
-            <Text style={styles.privacyFootText}>YOU CHOOSE IF YOUR LIBRARY SYNCS</Text>
-          </View>
+          )}
         </View>
-      </View>
+      )}
 
-      <View style={[styles.browseSection, compact && styles.browseSectionCompact]}>
-        <View style={[styles.browseIntro, compact && styles.browseIntroCompact]}>
-          <Text style={styles.sectionKicker}>A CHOICE, NOT A SETTINGS MAZE</Text>
-          <Text accessibilityRole="header" style={[styles.browseTitle, compact && styles.browseTitleCompact]}>
-            One shelf. Three ways to browse.
-          </Text>
-          <Text style={styles.browseBody}>
-            Switch between either source or view them together. The source names
-            stay simple, so the choice stays yours.
+      <View style={[styles.privateNote, compact && styles.privateNoteCompact]}>
+        <View style={styles.privateNoteMark}><Text style={styles.privateNoteMarkText}>i</Text></View>
+        <View style={styles.privateNoteCopy}>
+          <Text style={styles.privateNoteTitle}>A private UI experiment</Text>
+          <Text style={styles.privateNoteBody}>
+            All titles and artwork on this screen are fictional demo content. My List stays in this browser. No account, provider API, or video stream is connected.
           </Text>
         </View>
-        <View style={styles.sourceOptions}>
-          <SourcePill>Server 1</SourcePill>
-          <SourcePill active>Both Servers</SourcePill>
-          <SourcePill>Server 2</SourcePill>
-        </View>
+        <Text style={styles.privateNoteTag}>PERSONAL USE</Text>
       </View>
+      <Footer />
 
-      <View style={[styles.finalCta, compact && styles.finalCtaCompact]}>
-        <View style={styles.finalRule} />
-        <Text style={styles.finalEyebrow}>VIBEFLIX · ANDROID</Text>
-        <Text accessibilityRole="header" style={[styles.finalTitle, compact && styles.finalTitleCompact]}>
-          Your space. Your pace.
-        </Text>
-        <Text style={styles.finalBody}>
-          A personal app for keeping your place—and your library—close at hand.
-        </Text>
-        <View style={styles.finalAction}>
-          <ActionButton target="source" secondary>EXPLORE THE PROJECT</ActionButton>
-        </View>
-      </View>
-
-      <View style={[styles.footer, compact && styles.footerCompact]}>
-        <Brand compact />
-        <Text style={[styles.footerNote, compact && styles.footerNoteCompact]}>
-          An independent personal project. Not affiliated with Netflix or any content provider.
-          Use only services and content you are authorized to access.
-        </Text>
-        <Pressable accessibilityRole="link" onPress={openRepository}>
-          <Text style={styles.footerLink}>GITHUB ↗</Text>
-        </Pressable>
-        <Text style={styles.footerCopyright}>© 2026 VIBEFLIX</Text>
-      </View>
+      <DetailModal
+        item={selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onPlay={startPreview}
+        onToggleSaved={toggleSaved}
+        saved={selectedItem ? saved.has(selectedItem.id) : false}
+      />
+      <PlayerModal item={playingItem} onClose={() => setPlayingItem(null)} visible={Boolean(playingItem)} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: palette.ink,
-  },
-  page: {
-    flexGrow: 1,
-    backgroundColor: palette.ink,
-    overflow: "hidden",
-  },
-  topGlow: {
-    position: "absolute",
-    top: -280,
-    right: -160,
-    width: 760,
-    height: 600,
-    borderRadius: 400,
-    backgroundColor: "#321418",
-    opacity: 0.2,
-  },
-  nav: {
+  appRoot: { flex: 1, backgroundColor: INK },
+  pageContent: { flexGrow: 1, minHeight: "100vh", backgroundColor: INK },
+  heroStage: {
+    position: "relative",
     width: "100%",
-    maxWidth: 1380,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 24,
-    paddingBottom: 22,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: "#232121",
-    zIndex: 2,
-  },
-  navCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 16,
-  },
-  brand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  brandMark: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    backgroundColor: palette.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandMarkText: {
-    color: "#ffffff",
-    fontFamily: "Arial",
-    fontSize: 17,
-    lineHeight: 19,
-    fontWeight: "900",
-    transform: [{ skewX: "-8deg" }],
-  },
-  brandName: {
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 2.5,
-  },
-  brandNameCompact: {
-    fontSize: 10,
-    letterSpacing: 1.5,
-  },
-  navRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 30,
-  },
-  navAction: {
-    minHeight: 36,
-    justifyContent: "center",
-    paddingHorizontal: 3,
-  },
-  navActionQuiet: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#4b4544",
-  },
-  navActionText: {
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-  },
-  navActionTextQuiet: {
-    color: "#d0cbc7",
-  },
-  hero: {
-    width: "100%",
-    maxWidth: 1380,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 58,
-    paddingBottom: 76,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 36,
-  },
-  heroCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 44,
-    paddingBottom: 52,
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 28,
-  },
-  heroCopy: {
-    flex: 1,
-    maxWidth: 620,
-    paddingBottom: 14,
-  },
-  heroCopyCompact: {
-    maxWidth: 720,
-  },
-  eyebrowRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginBottom: 20,
-  },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 5,
-    backgroundColor: palette.red,
-  },
-  eyebrow: {
-    color: "#c9c2bd",
-    fontFamily: "Arial",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 2,
-  },
-  heroTitle: {
-    maxWidth: 620,
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 68,
-    fontWeight: "800",
-    lineHeight: 73,
-    letterSpacing: -2.8,
-  },
-  heroTitleCompact: {
-    fontSize: 50,
-    lineHeight: 54,
-    letterSpacing: -2,
-  },
-  heroTitleAccent: {
-    color: "#d7d0cb",
-  },
-  heroBody: {
-    maxWidth: 505,
-    marginTop: 20,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 17,
-    lineHeight: 27,
-  },
-  heroBodyCompact: {
-    maxWidth: 570,
-    marginTop: 16,
-    fontSize: 15,
-    lineHeight: 24,
-  },
-  heroActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 12,
-    marginTop: 28,
-  },
-  actionButton: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 18,
-    paddingHorizontal: 18,
-    backgroundColor: palette.red,
-    borderRadius: 3,
-  },
-  actionButtonSecondary: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#494342",
-  },
-  actionButtonText: {
-    color: "#fff",
-    fontFamily: "Arial",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.1,
-  },
-  actionButtonTextSecondary: {
-    color: "#eee9e5",
-  },
-  actionArrow: {
-    color: "#fff",
-    fontSize: 18,
-    lineHeight: 20,
-  },
-  actionArrowSecondary: {
-    color: "#e7e0db",
-  },
-  heroFootnote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 42,
-  },
-  heroFootnoteMark: {
-    color: palette.red,
-    fontFamily: "Arial",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  heroFootnoteText: {
-    color: palette.faint,
-    fontFamily: "Arial",
-    fontSize: 9,
-    letterSpacing: 1.4,
-  },
-  previewWrap: {
-    width: 400,
-    maxWidth: "100%",
-    alignSelf: "center",
-    alignItems: "center",
-    position: "relative",
-    paddingVertical: 14,
-  },
-  previewWrapCompact: {
-    width: 360,
-  },
-  previewHalo: {
-    position: "absolute",
-    top: 20,
-    left: 32,
-    right: 32,
-    bottom: 24,
-    borderRadius: 220,
-    backgroundColor: "#43161c",
-    opacity: 0.48,
-  },
-  deviceFrame: {
-    width: 305,
-    maxWidth: "100%",
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "#4d4847",
-    paddingHorizontal: 12,
-    paddingBottom: 11,
-    backgroundColor: "#111112",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.56,
-    shadowRadius: 28,
-    elevation: 18,
-  },
-  deviceTop: {
-    position: "relative",
-    height: 22,
-    justifyContent: "center",
-  },
-  deviceNotch: {
-    position: "absolute",
-    top: 0,
-    alignSelf: "center",
-    width: 80,
-    height: 13,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    backgroundColor: "#070708",
-  },
-  deviceStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 7,
-  },
-  deviceTime: {
-    color: "#e3dedb",
-    fontFamily: "Arial",
-    fontSize: 7,
-    fontWeight: "700",
-  },
-  deviceSignal: {
-    color: "#e3dedb",
-    fontFamily: "Arial",
-    fontSize: 7,
-  },
-  appHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-  },
-  profileDot: {
-    width: 23,
-    height: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 7,
-    backgroundColor: "#413a39",
-  },
-  profileDotText: {
-    color: "#f4f1ed",
-    fontFamily: "Arial",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  continueCard: {
-    position: "relative",
-    height: 236,
+    height: 620,
+    minHeight: 550,
     overflow: "hidden",
-    borderRadius: 10,
-    backgroundColor: "#252028",
+    backgroundColor: "#17191f",
   },
-  previewArt: {
+  heroStageCompact: { height: 560, minHeight: 520 },
+  heroArtwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
+  heroAtmosphere: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#0b0b0d", opacity: 0.12 },
+  heroLeftShade: { position: "absolute", top: 0, left: 0, bottom: 0, width: "66%", backgroundColor: "#08090c", opacity: 0.2 },
+  heroBottomShade: { position: "absolute", bottom: 0, left: 0, right: 0, height: 185, backgroundColor: INK, opacity: 0.48 },
+  header: {
     position: "absolute",
+    zIndex: 10,
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    borderRadius: 0,
-  },
-  continueScrim: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#080808",
-    opacity: 0.26,
-  },
-  continueCopy: {
-    position: "absolute",
-    left: 14,
-    bottom: 14,
-    right: 52,
-  },
-  continueEyebrow: {
-    color: "#e3d9d2",
-    fontFamily: "Arial",
-    fontSize: 7,
-    fontWeight: "700",
-    letterSpacing: 1.2,
-  },
-  continueTitle: {
-    marginTop: 4,
-    color: "#fff",
-    fontFamily: "Arial",
-    fontSize: 19,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  continueMeta: {
-    marginTop: 4,
-    color: "#ddd5d0",
-    fontFamily: "Arial",
-    fontSize: 8,
-  },
-  progressTrack: {
-    height: 3,
-    overflow: "hidden",
-    marginTop: 11,
-    borderRadius: 2,
-    backgroundColor: "#77716e",
-  },
-  progressFill: {
-    width: "61%",
-    height: "100%",
-    backgroundColor: palette.red,
-  },
-  continueTime: {
-    marginTop: 5,
-    color: "#c2b9b2",
-    fontFamily: "Arial",
-    fontSize: 7,
-  },
-  playButton: {
-    position: "absolute",
-    right: 13,
-    bottom: 30,
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#ffffff",
-    backgroundColor: "rgba(8,8,8,0.32)",
-  },
-  playGlyph: {
-    marginLeft: 2,
-    color: "#ffffff",
-    fontFamily: "Arial",
-    fontSize: 9,
-  },
-  previewShelfHeader: {
+    minHeight: 72,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 16,
-    marginBottom: 9,
-  },
-  previewShelfTitle: {
-    color: "#f4f1ed",
-    fontFamily: "Arial",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  previewShelfMore: {
-    color: "#9c9692",
-    fontFamily: "Arial",
-    fontSize: 6,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  previewShelf: {
-    flexDirection: "row",
-    gap: 7,
-  },
-  shelfArt: {
-    flex: 1,
-    height: 88,
-    borderRadius: 5,
-  },
-  previewTabBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingTop: 13,
-    paddingBottom: 3,
-  },
-  tabItem: {
-    alignItems: "center",
-    gap: 5,
-  },
-  tabGlyph: {
-    width: 13,
-    height: 9,
-    borderWidth: 1,
-    borderColor: "#88817d",
-    borderRadius: 2,
-  },
-  tabGlyphActive: {
-    borderColor: palette.red,
-    backgroundColor: palette.red,
-  },
-  tabLabel: {
-    color: "#8c8581",
-    fontFamily: "Arial",
-    fontSize: 6,
-  },
-  tabLabelActive: {
-    color: "#f4f1ed",
-    fontFamily: "Arial",
-    fontSize: 6,
-  },
-  previewCaption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginTop: 15,
-  },
-  captionRule: {
-    width: 21,
-    height: 1,
-    backgroundColor: palette.red,
-  },
-  captionText: {
-    color: "#8f8884",
-    fontFamily: "Arial",
-    fontSize: 9,
-    letterSpacing: 0.5,
-  },
-  artCard: {
-    position: "relative",
-    flex: 1,
-    minHeight: 170,
-    overflow: "hidden",
-    borderRadius: 7,
-  },
-  artGlow: {
-    position: "absolute",
-    top: "12%",
-    right: "10%",
-    width: "43%",
-    aspectRatio: 1,
-    borderRadius: 999,
-    opacity: 0.32,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 36,
-  },
-  artSun: {
-    position: "absolute",
-    top: "24%",
-    right: "20%",
-    width: "25%",
-    aspectRatio: 1,
-    borderRadius: 999,
-    opacity: 0.82,
-  },
-  artRidgeBack: {
-    position: "absolute",
-    left: "-20%",
-    bottom: "-5%",
-    width: "145%",
-    height: "48%",
-    borderTopLeftRadius: 180,
-    borderTopRightRadius: 220,
-    transform: [{ rotate: "-12deg" }],
-    opacity: 0.88,
-  },
-  artRidgeFront: {
-    position: "absolute",
-    left: "-24%",
-    bottom: "-28%",
-    width: "155%",
-    height: "53%",
-    borderTopLeftRadius: 170,
-    borderTopRightRadius: 160,
-    transform: [{ rotate: "8deg" }],
-  },
-  artCardCopy: {
-    position: "absolute",
-    left: 12,
-    right: 10,
-    bottom: 12,
-  },
-  artEyebrow: {
-    color: "#e9dcd5",
-    fontFamily: "Arial",
-    fontSize: 6,
-    fontWeight: "700",
-    letterSpacing: 1.1,
-  },
-  artTitle: {
-    marginTop: 3,
-    color: "#ffffff",
-    fontFamily: "Arial",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.4,
-  },
-  artIndex: {
-    position: "absolute",
-    top: 9,
-    left: 10,
-  },
-  artIndexText: {
-    color: "rgba(255,255,255,0.7)",
-    fontFamily: "Arial",
-    fontSize: 7,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  signalBar: {
-    width: "100%",
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#272424",
-    backgroundColor: "#0d0d0e",
-  },
-  signalInner: {
-    width: "100%",
-    maxWidth: 1268,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingVertical: 23,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 35,
-  },
-  signalInnerCompact: {
-    paddingHorizontal: 22,
-    flexWrap: "wrap",
-    gap: 18,
-  },
-  signalIntro: {
-    flex: 1,
-    minWidth: 200,
-  },
-  signalLabel: {
-    color: palette.red,
-    fontFamily: "Arial",
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 1.6,
-  },
-  signalStatement: {
-    marginTop: 5,
-    color: "#e8e3df",
-    fontFamily: "Arial",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  signalDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: "#393433",
-  },
-  signalStat: {
-    minWidth: 100,
-  },
-  signalStatValue: {
-    color: "#f6f2ee",
-    fontFamily: "Arial",
-    fontSize: 23,
-    fontWeight: "800",
-  },
-  signalStatLabel: {
-    marginTop: 2,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 9,
-  },
-  section: {
-    width: "100%",
-    maxWidth: 1268,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 100,
-    paddingBottom: 99,
-  },
-  sectionCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 70,
-    paddingBottom: 70,
-  },
-  sectionHeading: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 32,
-  },
-  sectionHeadingCompact: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 16,
-  },
-  sectionHeadingCopy: {
-    flex: 1,
-  },
-  sectionKicker: {
-    color: palette.red,
-    fontFamily: "Arial",
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.8,
-  },
-  sectionTitle: {
-    maxWidth: 690,
-    marginTop: 12,
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 38,
-    fontWeight: "800",
-    lineHeight: 44,
-    letterSpacing: -1.3,
-  },
-  sectionTitleCompact: {
-    fontSize: 31,
-    lineHeight: 36,
-    letterSpacing: -0.9,
-  },
-  sectionAside: {
-    maxWidth: 270,
-    paddingBottom: 4,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 12,
-    lineHeight: 19,
-  },
-  sectionAsideCompact: {
-    maxWidth: 400,
-  },
-  featureGrid: {
-    marginTop: 46,
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: palette.line,
-  },
-  featureGridCompact: {
-    flexDirection: "column",
-    marginTop: 30,
-  },
-  featureItem: {
-    flex: 1,
-    minHeight: 190,
-    flexDirection: "column",
-    paddingTop: 20,
-    paddingRight: 25,
-    paddingLeft: 21,
-    borderRightWidth: 1,
-    borderRightColor: palette.line,
-  },
-  featureItemCompact: {
-    minHeight: 0,
-    flexDirection: "row",
-    paddingTop: 21,
-    paddingRight: 0,
-    paddingBottom: 21,
-    paddingLeft: 0,
-    borderRightWidth: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.line,
-    gap: 20,
-  },
-  featureNumber: {
-    color: palette.red,
-    fontFamily: "Arial",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  featureCopy: {
-    marginTop: 26,
-  },
-  featureCopyCompact: {
-    flex: 1,
-    marginTop: 0,
-  },
-  featureTitle: {
-    color: "#f3efeb",
-    fontFamily: "Arial",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: -0.2,
-  },
-  featureBody: {
-    maxWidth: 310,
-    marginTop: 11,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  collectionSection: {
-    width: "100%",
-    maxWidth: 1380,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 75,
-    paddingBottom: 78,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 50,
-    backgroundColor: "#101011",
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#272424",
-  },
-  collectionSectionCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 58,
-    paddingBottom: 58,
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 34,
-  },
-  collectionCopy: {
-    width: 360,
-    maxWidth: "100%",
-  },
-  collectionCopyCompact: {
-    width: "100%",
-  },
-  collectionTitle: {
-    marginTop: 12,
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 37,
-    fontWeight: "800",
-    lineHeight: 43,
-    letterSpacing: -1.2,
-  },
-  collectionTitleCompact: {
-    maxWidth: 520,
-    fontSize: 31,
-    lineHeight: 36,
-  },
-  collectionBody: {
-    marginTop: 16,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 13,
-    lineHeight: 21,
-  },
-  collectionRule: {
-    width: 42,
-    height: 1,
-    marginTop: 25,
-    backgroundColor: palette.red,
-  },
-  collectionNote: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  collectionNoteMark: {
-    color: palette.red,
-    fontFamily: "Arial",
-    fontSize: 16,
-  },
-  collectionNoteText: {
-    flex: 1,
-    color: "#d5cfca",
-    fontFamily: "Arial",
-    fontSize: 11,
-    lineHeight: 17,
-  },
-  collectionArt: {
-    flex: 1,
-    minWidth: 0,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#373131",
-    borderRadius: 8,
-    backgroundColor: "#151516",
-  },
-  collectionArtCompact: {
-    padding: 12,
-  },
-  collectionArtHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 13,
-  },
-  collectionArtLabel: {
-    color: "#dad3ce",
-    fontFamily: "Arial",
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-  },
-  collectionArtCount: {
-    color: palette.faint,
-    fontFamily: "Arial",
-    fontSize: 8,
-    letterSpacing: 1,
-  },
-  artRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  artRowNarrow: {
-    gap: 8,
-  },
-  collectionPoster: {
-    height: 218,
-    minHeight: 120,
-  },
-  collectionArtFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginTop: 14,
-  },
-  collectionArtFooterLine: {
-    width: 20,
-    height: 1,
-    backgroundColor: palette.red,
-  },
-  collectionArtFooterText: {
-    color: palette.faint,
-    fontFamily: "Arial",
-    fontSize: 7,
-    letterSpacing: 1.1,
-  },
-  privacySection: {
-    width: "100%",
-    maxWidth: 1268,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 96,
-    paddingBottom: 98,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 70,
-  },
-  privacySectionCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 68,
-    paddingBottom: 68,
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 32,
-  },
-  privacyMark: {
-    position: "relative",
-    width: 126,
-    height: 126,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  privacyMarkOuter: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderWidth: 1,
-    borderColor: "#5c292e",
-    borderRadius: 70,
-  },
-  privacyMarkInner: {
-    width: 76,
-    height: 76,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#8c3339",
-    borderRadius: 40,
-    backgroundColor: "#1a1011",
-  },
-  privacyMarkCore: {
-    width: 22,
-    height: 22,
-    borderRadius: 20,
-    backgroundColor: palette.red,
-    shadowColor: palette.red,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 16,
-  },
-  privacyCopy: {
-    flex: 1,
-    maxWidth: 690,
-  },
-  privacyCopyCompact: {
-    flex: 0,
-    maxWidth: 600,
-  },
-  privacyTitle: {
-    maxWidth: 650,
-    marginTop: 12,
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 35,
-    fontWeight: "800",
-    lineHeight: 41,
-    letterSpacing: -1,
-  },
-  privacyTitleCompact: {
-    fontSize: 30,
-    lineHeight: 35,
-  },
-  privacyBody: {
-    maxWidth: 610,
-    marginTop: 14,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 13,
-    lineHeight: 21,
-  },
-  privacyFoot: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginTop: 22,
-  },
-  privacyCheck: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: "#322022",
-  },
-  privacyCheckText: {
-    color: "#f0b7b3",
-    fontFamily: "Arial",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  privacyFootText: {
-    color: "#c7c0bb",
-    fontFamily: "Arial",
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 1.1,
-  },
-  browseSection: {
-    width: "100%",
-    maxWidth: 1380,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 58,
-    paddingBottom: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 30,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#292525",
-    backgroundColor: "#101011",
-  },
-  browseSectionCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 46,
-    paddingBottom: 46,
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 26,
-  },
-  browseIntro: {
-    flex: 1,
-    maxWidth: 540,
-  },
-  browseIntroCompact: {
-    maxWidth: 640,
-  },
-  browseTitle: {
-    marginTop: 10,
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-  },
-  browseTitleCompact: {
-    fontSize: 25,
-  },
-  browseBody: {
-    maxWidth: 510,
-    marginTop: 10,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  sourceOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 9,
-  },
-  sourcePill: {
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 13,
-    borderWidth: 1,
-    borderColor: "#3a3433",
-    borderRadius: 30,
-    backgroundColor: "#151516",
-  },
-  sourcePillActive: {
-    borderColor: "#7b282e",
-    backgroundColor: "#251315",
-  },
-  sourceDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 5,
-    backgroundColor: "#7f7773",
-  },
-  sourceDotActive: {
-    backgroundColor: palette.red,
-  },
-  sourcePillText: {
-    color: "#d4ceca",
-    fontFamily: "Arial",
-    fontSize: 9,
-    fontWeight: "600",
-  },
-  sourcePillTextActive: {
-    color: "#fff2ee",
-  },
-  finalCta: {
-    alignItems: "center",
-    paddingHorizontal: 30,
-    paddingTop: 92,
-    paddingBottom: 92,
-  },
-  finalCtaCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 68,
-    paddingBottom: 70,
-  },
-  finalRule: {
-    width: 38,
-    height: 2,
-    marginBottom: 20,
-    backgroundColor: palette.red,
-  },
-  finalEyebrow: {
-    color: "#c7bfba",
-    fontFamily: "Arial",
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.8,
-  },
-  finalTitle: {
-    marginTop: 12,
-    color: palette.paper,
-    fontFamily: "Arial",
-    fontSize: 48,
-    fontWeight: "800",
-    letterSpacing: -1.8,
-    textAlign: "center",
-  },
-  finalTitleCompact: {
-    fontSize: 36,
-    letterSpacing: -1.2,
-  },
-  finalBody: {
-    maxWidth: 450,
-    marginTop: 13,
-    color: palette.muted,
-    fontFamily: "Arial",
-    fontSize: 13,
-    lineHeight: 21,
-    textAlign: "center",
-  },
-  finalAction: {
-    marginTop: 24,
-  },
-  footer: {
-    width: "100%",
-    maxWidth: 1380,
-    alignSelf: "center",
-    paddingHorizontal: 56,
-    paddingTop: 24,
-    paddingBottom: 27,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 22,
-    borderTopWidth: 1,
-    borderTopColor: "#272424",
-  },
-  footerCompact: {
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 25,
-    flexWrap: "wrap",
-    gap: 15,
-  },
-  footerNote: {
-    flex: 1,
-    maxWidth: 550,
-    color: palette.faint,
-    fontFamily: "Arial",
-    fontSize: 9,
-    lineHeight: 15,
-  },
-  footerNoteCompact: {
-    flexBasis: "100%",
-    maxWidth: 560,
-  },
-  footerLink: {
-    color: "#d9d2cd",
-    fontFamily: "Arial",
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.1,
-  },
-  footerCopyright: {
-    color: palette.faint,
-    fontFamily: "Arial",
-    fontSize: 8,
-    letterSpacing: 1,
-  },
+    backgroundColor: "rgba(8,8,8,0.63)",
+  },
+  headerCompact: { minHeight: 64, paddingHorizontal: 18, paddingVertical: 12 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 36, flex: 1 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brandMark: { width: 29, height: 29, alignItems: "center", justifyContent: "center", borderRadius: 5, backgroundColor: RED },
+  brandMarkText: { color: "#ffffff", fontFamily: "Arial", fontSize: 20, fontWeight: "900", lineHeight: 22, transform: [{ skewX: "-8deg" }] },
+  brandWord: { color: RED, fontFamily: "Arial", fontSize: 17, fontWeight: "900", letterSpacing: 1.6 },
+  navItems: { flexDirection: "row", alignItems: "center", gap: 21 },
+  navPressable: { minHeight: 32, justifyContent: "center" },
+  navText: { color: "#e1ddda", fontFamily: "Arial", fontSize: 12, fontWeight: "500" },
+  navTextActive: { color: "#ffffff", fontWeight: "800" },
+  headerRight: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 18 },
+  headerRightCompact: { gap: 8 },
+  headerIconButton: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+  headerIconButtonCompact: { width: 28 },
+  searchIcon: { color: "#f5f2ef", fontFamily: "Arial", fontSize: 27, lineHeight: 30 },
+  kidsLink: { color: "#f2efeb", fontFamily: "Arial", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+  avatarButton: { width: 31, height: 31, alignItems: "center", justifyContent: "center", borderRadius: 6, backgroundColor: "#714149" },
+  avatarText: { color: "#fff", fontFamily: "Arial", fontSize: 13, fontWeight: "700" },
+  searchBox: { width: 230, height: 36, flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 9, borderWidth: 1, borderColor: "#b5b1ad", backgroundColor: "rgba(8,8,8,0.9)" },
+  searchBoxCompact: { width: 118, gap: 4, paddingHorizontal: 6 },
+  searchGlyph: { color: "#f5f2ef", fontFamily: "Arial", fontSize: 23, lineHeight: 25 },
+  searchInput: { flex: 1, minWidth: 0, color: "#fff", fontFamily: "Arial", fontSize: 12, paddingVertical: 4, outlineStyle: "none" },
+  searchClear: { color: "#fff", fontFamily: "Arial", fontSize: 21 },
+  mobileMenuButton: { minHeight: 32, justifyContent: "center", paddingHorizontal: 6 },
+  mobileMenuText: { color: "#fff", fontFamily: "Arial", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  mobileMenu: { position: "absolute", top: 57, right: 18, zIndex: 20, minWidth: 170, paddingVertical: 8, backgroundColor: "rgba(15,15,16,0.98)", borderWidth: 1, borderColor: "#333" },
+  mobileMenuItem: { minHeight: 42, justifyContent: "center", paddingHorizontal: 17 },
+  mobileMenuItemText: { color: "#ddd", fontFamily: "Arial", fontSize: 13 },
+  heroContent: { position: "absolute", zIndex: 2, left: 52, bottom: 88, width: 560, maxWidth: "55%" },
+  heroContentCompact: { left: 21, right: 20, bottom: 58, width: "auto", maxWidth: 470 },
+  spotlightLabel: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  spotlightMark: { width: 20, height: 23, alignItems: "center", justifyContent: "center", borderRadius: 3, backgroundColor: RED },
+  spotlightMarkText: { color: "#fff", fontFamily: "Arial", fontSize: 14, fontWeight: "900" },
+  spotlightText: { color: "#eee9e5", fontFamily: "Arial", fontSize: 10, fontWeight: "800", letterSpacing: 2.1 },
+  heroTitle: { color: "#fff", fontFamily: "Arial", fontSize: 58, fontWeight: "900", lineHeight: 63, letterSpacing: -1.6, textShadowColor: "rgba(0,0,0,0.45)", textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 7 },
+  heroTitleCompact: { maxWidth: 400, fontSize: 41, lineHeight: 45, letterSpacing: -1.1 },
+  heroMetadata: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 9, marginTop: 14 },
+  matchText: { color: "#46d369", fontFamily: "Arial", fontSize: 11, fontWeight: "800" },
+  metadataDot: { color: "#d0cbc7", fontFamily: "Arial", fontSize: 10 },
+  heroMetaText: { color: "#e8e3df", fontFamily: "Arial", fontSize: 11 },
+  heroSynopsis: { maxWidth: 520, marginTop: 13, color: "#f1eeeb", fontFamily: "Arial", fontSize: 14, lineHeight: 21, textShadowColor: "rgba(0,0,0,0.65)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  heroSynopsisCompact: { maxWidth: 430, fontSize: 12, lineHeight: 18 },
+  heroActions: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 21 },
+  solidButton: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingHorizontal: 17, borderRadius: 4, backgroundColor: "#f5f2ef" },
+  solidButtonQuiet: { backgroundColor: "rgba(109,108,109,0.82)" },
+  solidButtonHover: { backgroundColor: "#dedad7" },
+  solidButtonPressed: { opacity: 0.78 },
+  solidButtonText: { color: "#111", fontFamily: "Arial", fontSize: 13, fontWeight: "800" },
+  solidButtonTextQuiet: { color: "#fff" },
+  solidButtonIcon: { color: "#111", fontFamily: "Arial", fontSize: 13 },
+  quietIcon: { color: "#fff" },
+  heroGenre: { marginTop: 15, color: "#d8d3cf", fontFamily: "Arial", fontSize: 10, letterSpacing: 0.2 },
+  heroSideNote: { position: "absolute", zIndex: 3, right: 24, bottom: 111, flexDirection: "row", alignItems: "center", gap: 8, transform: [{ rotate: "-90deg" }], transformOrigin: "right bottom" },
+  heroSideRule: { width: 28, height: 2, backgroundColor: RED },
+  heroSideText: { color: "#ebe5df", fontFamily: "Arial", fontSize: 8, fontWeight: "700", letterSpacing: 1.6 },
+  heroAgeBadge: { position: "absolute", right: 0, bottom: 110, width: 52, minHeight: 39, justifyContent: "center", paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: RED, backgroundColor: "rgba(23,23,24,0.76)" },
+  heroAgeText: { color: "#f6f2ee", fontFamily: "Arial", fontSize: 12, fontWeight: "700" },
+  catalogHeader: { position: "relative", height: 190, backgroundColor: "#141416" },
+  catalogHeaderCompact: { height: 180 },
+  catalogIntro: { position: "absolute", left: 52, bottom: 24 },
+  catalogKicker: { color: "#d4cfcb", fontFamily: "Arial", fontSize: 9, fontWeight: "700", letterSpacing: 1.5 },
+  catalogTitle: { marginTop: 7, color: "#fff", fontFamily: "Arial", fontSize: 35, fontWeight: "800", letterSpacing: -0.6 },
+  catalogTitleCompact: { fontSize: 29 },
+  catalogSubcopy: { marginTop: 6, color: MUTED, fontFamily: "Arial", fontSize: 11 },
+  rowsWrap: { position: "relative", zIndex: 3, marginTop: -61, paddingBottom: 15 },
+  rowsWrapCompact: { marginTop: -40 },
+  rowSection: { marginBottom: 29 },
+  rowHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 48, marginBottom: 12 },
+  rowTitleGroup: { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", gap: 12 },
+  rowTitle: { color: "#f4f1ed", fontFamily: "Arial", fontSize: 19, fontWeight: "800", letterSpacing: -0.2 },
+  rowTitleCompact: { fontSize: 16 },
+  rowNote: { color: "#9d9996", fontFamily: "Arial", fontSize: 8, fontWeight: "700", letterSpacing: 1.1 },
+  rowMore: { flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 10 },
+  rowMoreText: { color: "#aaa5a1", fontFamily: "Arial", fontSize: 8, fontWeight: "700", letterSpacing: 1 },
+  rowMoreArrow: { color: "#aaa5a1", fontFamily: "Arial", fontSize: 18, lineHeight: 18 },
+  rowScroller: { gap: 10, paddingHorizontal: 48, paddingTop: 2, paddingBottom: 7 },
+  rowScrollerCompact: { gap: 8, paddingHorizontal: 20 },
+  titleCard: { width: 232, borderRadius: 5, overflow: "hidden", backgroundColor: "#171719", transform: [{ scale: 1 }], zIndex: 1 },
+  titleCardCompact: { width: 180 },
+  titleCardHover: { transform: [{ scale: 1.045 }], zIndex: 5 },
+  titleCardPressed: { transform: [{ scale: 0.985 }] },
+  cardArtworkWrap: { position: "relative", width: "100%", height: 130, overflow: "hidden", backgroundColor: "#292934" },
+  cardArtwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
+  cardArtworkShade: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.13)" },
+  cardTopLine: { position: "absolute", top: 8, left: 9, right: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cardType: { color: "#f4e5d8", fontFamily: "Arial", fontSize: 7, fontWeight: "800", letterSpacing: 1.1, textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  cardMatch: { color: "#4de278", fontFamily: "Arial", fontSize: 8, fontWeight: "800", textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  cardPlayDot: { position: "absolute", right: 9, bottom: 9, width: 27, height: 27, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.85)", borderRadius: 16, backgroundColor: "rgba(9,9,10,0.55)" },
+  cardPlayIcon: { marginLeft: 2, color: "#fff", fontFamily: "Arial", fontSize: 9 },
+  cardProgressTrack: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3, backgroundColor: "rgba(255,255,255,0.42)" },
+  cardProgressFill: { height: 3, backgroundColor: RED },
+  cardCopy: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 },
+  cardTitle: { color: "#f4f1ed", fontFamily: "Arial", fontSize: 12, fontWeight: "700" },
+  cardSubline: { marginTop: 4, color: "#9d9996", fontFamily: "Arial", fontSize: 9 },
+  emptyState: { minHeight: 250, alignItems: "center", justifyContent: "center", paddingHorizontal: 25, paddingVertical: 45 },
+  emptyMark: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#57514e", borderRadius: 22 },
+  emptyMarkText: { color: "#eee", fontFamily: "Arial", fontSize: 24 },
+  emptyTitle: { marginTop: 16, color: "#fff", fontFamily: "Arial", fontSize: 20, fontWeight: "700" },
+  emptyBody: { maxWidth: 380, marginTop: 8, color: MUTED, fontFamily: "Arial", fontSize: 12, lineHeight: 19, textAlign: "center" },
+  emptyButton: { marginTop: 20, paddingHorizontal: 15, paddingVertical: 11, borderRadius: 3, backgroundColor: RED },
+  emptyButtonText: { color: "#fff", fontFamily: "Arial", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  noResults: { alignItems: "center", padding: 50 },
+  noResultsTitle: { color: "#fff", fontFamily: "Arial", fontSize: 19, fontWeight: "700" },
+  noResultsBody: { marginTop: 8, color: MUTED, fontFamily: "Arial", fontSize: 12 },
+  clearSearchButton: { marginTop: 16, padding: 10 },
+  clearSearchText: { color: "#fff", fontFamily: "Arial", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  privateNote: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 48, marginTop: 11, marginBottom: 49, paddingHorizontal: 17, paddingVertical: 14, borderWidth: 1, borderColor: "#2d2928", backgroundColor: "#101011" },
+  privateNoteCompact: { marginHorizontal: 20, marginBottom: 33, paddingHorizontal: 12, flexWrap: "wrap" },
+  privateNoteMark: { width: 22, height: 22, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "#353033" },
+  privateNoteMarkText: { color: "#e7c9c5", fontFamily: "Arial", fontSize: 12, fontWeight: "700" },
+  privateNoteCopy: { flex: 1, minWidth: 180 },
+  privateNoteTitle: { color: "#e7e1dd", fontFamily: "Arial", fontSize: 10, fontWeight: "700" },
+  privateNoteBody: { marginTop: 4, color: "#938d89", fontFamily: "Arial", fontSize: 9, lineHeight: 14 },
+  privateNoteTag: { color: "#aaa3a0", fontFamily: "Arial", fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  footer: { paddingHorizontal: 48, paddingTop: 23, paddingBottom: 27, borderTopWidth: 1, borderTopColor: "#242121" },
+  footerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  footerLabel: { color: "#8c8581", fontFamily: "Arial", fontSize: 8, fontWeight: "700", letterSpacing: 1.2 },
+  footerText: { maxWidth: 740, marginTop: 16, color: "#79736f", fontFamily: "Arial", fontSize: 9, lineHeight: 15 },
+  footerBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 21 },
+  footerSmall: { color: "#6d6763", fontFamily: "Arial", fontSize: 8, letterSpacing: 0.7 },
+  footerLink: { color: "#c9c2bd", fontFamily: "Arial", fontSize: 8, fontWeight: "700", letterSpacing: 1 },
+  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 18, paddingVertical: 22, backgroundColor: "rgba(0,0,0,0.78)" },
+  modalDismiss: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  detailSheet: { width: "100%", maxWidth: 680, maxHeight: "92%", overflow: "hidden", borderRadius: 8, backgroundColor: "#181819" },
+  detailArtworkWrap: { position: "relative", width: "100%", height: 270, backgroundColor: "#23232c" },
+  detailArtwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
+  detailArtworkFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 125, backgroundColor: "rgba(24,24,25,0.65)" },
+  closeButton: { position: "absolute", top: 13, right: 13, width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 20, backgroundColor: "rgba(8,8,8,0.78)" },
+  closeButtonText: { color: "#fff", fontFamily: "Arial", fontSize: 26, lineHeight: 29 },
+  detailContent: { paddingHorizontal: 27, paddingTop: 7, paddingBottom: 26 },
+  detailKicker: { color: "#a9a19c", fontFamily: "Arial", fontSize: 8, fontWeight: "800", letterSpacing: 1.5 },
+  detailTitle: { marginTop: 7, color: "#fff", fontFamily: "Arial", fontSize: 30, fontWeight: "800", letterSpacing: -0.6 },
+  detailMetadata: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 11 },
+  detailMetaText: { color: "#ddd7d3", fontFamily: "Arial", fontSize: 10 },
+  detailSynopsis: { maxWidth: 580, marginTop: 16, color: "#e7e2de", fontFamily: "Arial", fontSize: 12, lineHeight: 19 },
+  detailGenres: { marginTop: 13, color: "#c3bcb7", fontFamily: "Arial", fontSize: 10 },
+  detailGenreLabel: { color: "#8f8985" },
+  detailActions: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 19 },
+  listButton: { minHeight: 42, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: "#797270", borderRadius: 4, backgroundColor: "#252526" },
+  listButtonIcon: { color: "#fff", fontFamily: "Arial", fontSize: 20, lineHeight: 22 },
+  listButtonText: { color: "#fff", fontFamily: "Arial", fontSize: 11, fontWeight: "700" },
+  detailDisclaimer: { marginTop: 19, color: "#77716d", fontFamily: "Arial", fontSize: 8, lineHeight: 13 },
+  playerBackdrop: { flex: 1, position: "relative", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: "#070708" },
+  playerArtwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", opacity: 0.45 },
+  playerShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.66)" },
+  closeButtonPlayer: { position: "absolute", top: 28, right: 28, width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 24, backgroundColor: "rgba(20,20,21,0.8)" },
+  playerMessage: { zIndex: 1, alignItems: "center", paddingHorizontal: 22 },
+  playerIconCircle: { width: 58, height: 58, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.75)", borderRadius: 32 },
+  playerIcon: { marginLeft: 3, color: "#fff", fontFamily: "Arial", fontSize: 18 },
+  playerTitle: { marginTop: 18, color: "#fff", fontFamily: "Arial", fontSize: 25, fontWeight: "800", textAlign: "center" },
+  playerBody: { maxWidth: 400, marginTop: 10, color: "#d4cfcb", fontFamily: "Arial", fontSize: 12, lineHeight: 19, textAlign: "center" },
+  playerPrototypeLabel: { position: "absolute", bottom: 23, color: "#a8a19c", fontFamily: "Arial", fontSize: 8, fontWeight: "700", letterSpacing: 1.5, textAlign: "center" },
 });

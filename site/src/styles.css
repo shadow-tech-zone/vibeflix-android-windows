@@ -1,45 +1,43 @@
+:root {
+  color-scheme: dark;
+  font-family: Arial, sans-serif;
+  background: #080808;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 * {
   box-sizing: border-box;
 }
 
-html {
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
   background: #080808;
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
-  background: #080808;
-  color: #f4f1ed;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-#root {
-  min-height: 100vh;
+button,
+input {
+  font: inherit;
 }
 
-::selection {
-  color: #fff;
-  background: #9f1018;
+button {
+  cursor: pointer;
 }
 
-:focus-visible {
-  outline: 2px solid #f1c5c2;
-  outline-offset: 4px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+@media (max-width: 760px) {
+  ::-webkit-scrollbar {
+    height: 0;
+    width: 0;
   }
 }

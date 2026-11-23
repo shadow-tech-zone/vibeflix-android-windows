@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" fill="none">
+  <defs><linearGradient id="a" x1="400" y1="0" x2="400" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#40657A"/><stop offset=".55" stop-color="#D18A6D"/><stop offset="1" stop-color="#211F29"/></linearGradient><linearGradient id="b" x1="400" y1="210" x2="400" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#2E3944"/><stop offset="1" stop-color="#11141C"/></linearGradient></defs>
+  <rect width="800" height="450" fill="url(#a)"/><circle cx="568" cy="147" r="61" fill="#F1C999" fill-opacity=".83"/>
+  <path d="M0 333h67V221h78v112h42V174h94v159h63V236h76v97h48V198h105v135h45V156h112v177h70v117H0V333Z" fill="url(#b)"/>
+  <path d="M67 250h15v20H67zm0 37h15v20H67zm94-76h18v22h-18zm0 42h18v22h-18zm98-49h18v22h-18zm0 43h18v22h-18zm160 12h15v20h-15zm143-45h18v22h-18zm0 45h18v22h-18zm111-59h18v22h-18zm0 46h18v22h-18z" fill="#E7B17F" fill-opacity=".55"/>
+  <path d="M0 389c137-38 235-25 350 0s243 23 450-14v75H0v-61Z" fill="#0D1117" fill-opacity=".72"/>
+</svg>

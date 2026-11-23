@@ -1,6 +1,10 @@
-# VibeFlix one-page overview
+# VibeFlix private streaming UI experiment
 
-A static, single-page React Native Web companion site for the Android app. It uses hand-authored layout and abstract, fictional CSS/React Native artwork; there are no remote images or downloaded brand assets.
+A personal, static streaming-catalog prototype built with React Native Web and Vite. This is a hobby UI experiment—not a streaming service, media player, or provider integration.
+
+The demo uses fictional titles, descriptions, and hand-authored original SVG illustrations. It includes responsive home, series, films, search, details, and My List screens. My List is saved in the current browser's local storage; nothing is sent to a backend. The Play action opens a clearly labelled preview state and does not load media. No third-party image, font, or provider API is required.
+
+The Vercel project is deliberately protected by Vercel SSO. Do not make it public or disable that protection.
 
 ## Local development
 
@@ -15,4 +19,4 @@ npm run dev
 npm run build
 ```
 
-Vercel project settings: root directory `site`, framework Vite, install `npm ci`, build `npm run build`, output `dist`. This page describes the Android app; it is not an in-browser player or a replacement app.
+Vercel project settings: root directory `site`, framework Vite, install `npm ci`, build `npm run build`, output `dist`.
