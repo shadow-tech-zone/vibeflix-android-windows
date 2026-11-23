@@ -1,0 +1,30 @@
+# Gradle / Android build output
+.gradle/
+**/build/
+**/local.properties
+*.iml
+.idea/
+
+# .NET / WinUI build output
+**/bin/
+**/obj/
+.vs/
+TestResults/
+
+# Generated install/release artifacts
+*.apk
+*.aab
+
+# Local secrets and signing material (never commit)
+.env
+.env.*
+!.env.example
+signing/
+*.jks
+*.keystore
+*.p12
+password.txt
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
