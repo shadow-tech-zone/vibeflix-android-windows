@@ -1,13 +1,13 @@
 # VibeFlix private streaming UI experiment
 
-A personal, responsive React Native Web prototype that follows the familiar dark-and-red streaming-catalog design language: a cinematic featured title, horizontal discovery rails, title details, and a persistent My List. It is an independent hobby project, not Netflix, and does not use Netflix logos, media, or downloaded artwork.
+A personal, responsive React Native Web prototype that reimplements a familiar dark-and-red streaming-product front end with original VibeFlix branding: a marketing landing page and FAQ, a visual-only sign-in screen, a three-step local demo setup, a cinematic featured title, horizontal discovery rails, title details, and a browser-local My List. It is an independent hobby project, not Netflix, and does not use Netflix logos, media, or downloaded artwork.
 
 ## Architecture
 
 - React 19 + React Native Web components for consistent responsive UI primitives.
 - Vite 8 for development and production builds; versions were checked against the npm registry before this pass and are already current.
 - `src/data/catalog.js` owns fictional title metadata and row composition.
-- `src/components/` contains isolated navigation, spotlight, rails, cards, details, and playback-shell components. TV Shows and Movies compose separate genre rails; New & Popular groups trending, recent, and type-specific picks. The fixed navigation darkens on scroll, while desktop rails expose keyboard-accessible arrows and mobile keeps swipe navigation.
+- `src/components/` contains isolated entry, navigation, spotlight, rail, card, details, playback, and footer components. The landing page has alternating feature panels and an accordion FAQ; the three-step setup chooses a local demo profile, while sign-in is visual-only and never sends or saves credentials. TV Shows and Movies compose separate genre rails; New & Popular groups trending, recent, and type-specific picks. The fixed navigation darkens on scroll, while desktop rails expose keyboard-accessible arrows and mobile keeps swipe navigation.
 - `src/hooks/useMyList.js` owns the browser-persisted watchlist state.
 - A root render error boundary shows a recovery view instead of leaving an empty page.
 

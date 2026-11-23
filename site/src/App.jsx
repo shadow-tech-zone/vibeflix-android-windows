@@ -9,10 +9,13 @@ import {
 } from "react-native";
 import EmptyState from "./components/EmptyState.jsx";
 import Footer from "./components/Footer.jsx";
+import GetStartedFlow from "./components/GetStartedFlow.jsx";
 import MediaRail from "./components/MediaRail.jsx";
 import Navigation from "./components/Navigation.jsx";
 import PlaybackOverlay from "./components/PlaybackOverlay.jsx";
+import SignInPage from "./components/SignInPage.jsx";
 import SpotlightHero from "./components/SpotlightHero.jsx";
+import WelcomePage from "./components/WelcomePage.jsx";
 import TitleDetailsModal from "./components/TitleDetailsModal.jsx";
 import {
   buildHomeRows,
@@ -50,6 +53,7 @@ export default function App() {
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const pageScrollRef = useRef(null);
+  const [screen, setScreen] = useState("welcome");
   const [activeTab, setActiveTab] = useState("Home");
   const [profile, setProfile] = useState("Sam");
   const [scrolled, setScrolled] = useState(false);
@@ -185,6 +189,47 @@ export default function App() {
         ? "Browse"
         : activeTab;
 
+  const enterBrowse = (selectedProfile = profile) => {
+    setProfile(selectedProfile);
+    setActiveTab("Home");
+    setSearchOpen(false);
+    setQuery("");
+    setScreen("browse");
+  };
+
+  if (screen === "welcome") {
+    return (
+      <WelcomePage
+        compact={compact}
+        onBrowse={() => enterBrowse()}
+        onSignIn={() => setScreen("sign-in")}
+        onGetStarted={() => setScreen("get-started")}
+      />
+    );
+  }
+
+  if (screen === "sign-in") {
+    return (
+      <SignInPage
+        compact={compact}
+        onBack={() => setScreen("welcome")}
+        onBrowse={() => enterBrowse()}
+        onGetStarted={() => setScreen("get-started")}
+      />
+    );
+  }
+
+  if (screen === "get-started") {
+    return (
+      <GetStartedFlow
+        compact={compact}
+        onBack={() => setScreen("welcome")}
+        onSignIn={() => setScreen("sign-in")}
+        onComplete={enterBrowse}
+      />
+    );
+  }
+
   return (
     <ScrollView
       ref={pageScrollRef}
@@ -228,7 +273,7 @@ export default function App() {
         </View>
       )}
 
-      <Footer />
+      <Footer onOpenWelcome={() => setScreen("welcome")} />
       <TitleDetailsModal
         item={selectedItem}
         saved={selectedItem ? savedSet.has(selectedItem.id) : false}
