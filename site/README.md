@@ -1,10 +1,19 @@
 # VibeFlix private streaming UI experiment
 
-A personal, static streaming-catalog prototype built with React Native Web and Vite. This is a hobby UI experiment—not a streaming service, media player, or provider integration.
+A personal, responsive React Native Web prototype that follows the familiar dark-and-red streaming-catalog design language: a cinematic featured title, horizontal discovery rails, title details, and a persistent My List. It is an independent hobby project, not Netflix, and does not use Netflix logos, media, or downloaded artwork.
 
-The demo uses fictional titles, descriptions, and hand-authored original SVG illustrations. It includes responsive home, series, films, search, details, and My List screens. My List is saved in the current browser's local storage; nothing is sent to a backend. The Play action opens a clearly labelled preview state and does not load media. No third-party image, font, or provider API is required.
+## Architecture
 
-The Vercel project is deliberately protected by Vercel SSO. Do not make it public or disable that protection.
+- React 19 + React Native Web components for consistent responsive UI primitives.
+- Vite 8 for development and production builds; versions were checked against the npm registry before this pass and are already current.
+- `src/data/catalog.js` owns fictional title metadata and row composition.
+- `src/components/` contains isolated navigation, spotlight, rails, cards, details, and playback-shell components.
+- `src/hooks/useMyList.js` owns the browser-persisted watchlist state.
+- A root render error boundary shows a recovery view instead of leaving an empty page.
+
+The app is intentionally self-contained: original local SVG illustrations, no remote fonts or image services, no account backend, no provider API, and no actual stream source. My List is stored only in the current browser. The Play action opens an honest preview shell until a licensed playback source is configured.
+
+The Vercel project must remain protected by SSO for personal use. Do not make it public or disable that protection.
 
 ## Local development
 
@@ -13,7 +22,7 @@ npm ci
 npm run dev
 ```
 
-## Build
+## Production build
 
 ```sh
 npm run build
