@@ -608,8 +608,18 @@ public sealed partial class MainWindow
         Border? titlePreview = null;
         if (!landscape && poster.Child is Grid posterGrid)
         {
-            var previewContent = new StackPanel { Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
-            var previewTitle = CreateText(title.Name, 14, "#FFFFFF", FontWeights.SemiBold, TextWrapping.Wrap);
+            var compactPreview = width < 148;
+            var previewContent = new StackPanel
+            {
+                Spacing = compactPreview ? 5 : 8,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var previewTitle = CreateText(
+                title.Name,
+                compactPreview ? 12 : 14,
+                "#FFFFFF",
+                FontWeights.SemiBold,
+                TextWrapping.Wrap);
             previewTitle.MaxLines = 2;
             previewTitle.TextTrimming = TextTrimming.CharacterEllipsis;
             previewContent.Children.Add(previewTitle);
@@ -622,23 +632,30 @@ public sealed partial class MainWindow
             }.Where(part => !string.IsNullOrWhiteSpace(part));
             var previewMetadata = CreateText(
                 string.Join("  ·  ", previewMetadataParts),
-                10,
+                compactPreview ? 9 : 10,
                 "#D0D0D0",
                 FontWeights.SemiBold,
                 TextWrapping.Wrap);
-            previewMetadata.MaxLines = 2;
+            previewMetadata.MaxLines = compactPreview ? 1 : 2;
+            previewMetadata.TextTrimming = TextTrimming.CharacterEllipsis;
             previewContent.Children.Add(previewMetadata);
             var synopsis = CreateText(
                 string.IsNullOrWhiteSpace(title.Synopsis) ? "Open the title for provider details." : title.Synopsis,
-                11,
+                compactPreview ? 10 : 11,
                 "#E5E5E5",
                 TextWrapping.Wrap);
-            synopsis.MaxLines = 4;
+            synopsis.MaxLines = compactPreview ? 2 : 4;
+            synopsis.TextTrimming = TextTrimming.CharacterEllipsis;
             previewContent.Children.Add(synopsis);
-            previewContent.Children.Add(CreateText("VIEW TITLE DETAILS", 8, "#F08A92", FontWeights.SemiBold, characterSpacing: 65));
+            previewContent.Children.Add(CreateText(
+                "VIEW TITLE DETAILS",
+                compactPreview ? 7 : 8,
+                "#F08A92",
+                FontWeights.SemiBold,
+                characterSpacing: compactPreview ? 40 : 65));
             titlePreview = new Border
             {
-                Padding = new Thickness(11),
+                Padding = compactPreview ? new Thickness(8) : new Thickness(11),
                 CornerRadius = new CornerRadius(7),
                 Background = Brush("#E6101010"),
                 VerticalAlignment = VerticalAlignment.Stretch,
