@@ -88,16 +88,17 @@ async function testSource(sourceIndex, label) {
   const result = await providerRequest({ action: 'catalog', sourceIndex, filter: 'All', page: 1 })
   if (!Array.isArray(result.titles)) throw new Error(`${label} returned no catalog array.`)
   const titles = result.titles
+  if (!titles.length) throw new Error(`${label} returned an empty first catalog page.`)
   console.log(`${label}: catalog returned ${titles.length} title(s); source unavailable=${sourceIndex === 1 ? result.server1Unavailable : result.server2Unavailable}`)
-  if (!titles.length) return
 
   const chosen = titles.find((title) => title.kind === 'Movie') || titles.find((title) => title.kind === 'Series')
-  if (!chosen) return
+  if (!chosen) throw new Error(`${label} did not return a playable movie or series.`)
   const details = await providerRequest({ action: 'details', source: chosen.source, catalogPath: chosen.catalogPath })
   console.log(`${label}: title details loaded (${chosen.kind}; ${details.seasons?.length || 0} season(s)).`)
 
   let episodeCatalogPath
-  if (chosen.kind === 'Series' && details.seasons?.length) {
+  if (chosen.kind === 'Series') {
+    if (!details.seasons?.length) throw new Error(`${label} series details returned no seasons.`)
     const season = details.seasons[0]
     const episodeResult = await providerRequest({
       action: 'episodes',
@@ -106,32 +107,24 @@ async function testSource(sourceIndex, label) {
       seasonNumber: season.number,
       seasonPath: season.path,
     })
-    const episode = episodeResult.episodes?.[0]
-    if (episode) {
-      episodeCatalogPath = episode.catalogPath
-      console.log(`${label}: season ${season.number} returned ${episodeResult.episodes.length} episode(s).`)
-    } else {
-      console.log(`${label}: season ${season.number} returned no episodes.`)
-    }
+    const episodes = episodeResult.episodes || []
+    const episode = episodes[0]
+    if (!episode) throw new Error(`${label} season ${season.number} returned no episodes.`)
+    episodeCatalogPath = episode.catalogPath
+    console.log(`${label}: season ${season.number} returned ${episodes.length} episode(s).`)
   }
 
-  try {
-    const resolution = await providerRequest({
-      action: 'resolve',
-      source: chosen.source,
-      catalogPath: chosen.catalogPath,
-      episodeCatalogPath,
-    })
-    const stream = resolution.streams?.[0]
-    if (!stream) {
-      console.log(`${label}: stream resolution returned no stream.`)
-      return
-    }
-    const probe = await probeMedia(stream.url, stream.mimeType)
-    console.log(`${label}: resolved ${resolution.streams.length} stream(s); first media response=${probe.status}; reachable=${probe.reachable}; Pages-origin CORS=${probe.cors}; ${probe.segment}.`)
-  } catch (error) {
-    console.log(`${label}: on-demand stream resolution failed (${error instanceof Error ? error.message : 'provider error'}).`)
-  }
+  const resolution = await providerRequest({
+    action: 'resolve',
+    source: chosen.source,
+    catalogPath: chosen.catalogPath,
+    episodeCatalogPath,
+  })
+  const stream = resolution.streams?.[0]
+  if (!stream) throw new Error(`${label} stream resolution returned no stream.`)
+  const probe = await probeMedia(stream.url, stream.mimeType)
+  console.log(`${label}: resolved ${resolution.streams.length} stream(s); media HTTP=${probe.status}; reachable=${probe.reachable}; Pages-origin CORS=${probe.cors}; ${probe.segment}.`)
+  return { label, ...probe }
 }
 
 try {
@@ -150,7 +143,23 @@ try {
     throw new Error(`Pages-origin CORS preflight failed (HTTP ${preflight.status}).`)
   }
   console.log('GitHub Pages-origin CORS preflight: passed.')
-  await Promise.all([testSource(1, 'Server 1'), testSource(2, 'Server 2')])
+
+  const results = await Promise.allSettled([
+    testSource(1, 'Server 1'),
+    testSource(2, 'Server 2'),
+  ])
+  let failed = false
+  for (let index = 0; index < results.length; index++) {
+    const result = results[index]
+    const label = index === 0 ? 'Server 1' : 'Server 2'
+    if (result.status === 'rejected') {
+      failed = true
+      console.error(`${label} live check failed: ${result.reason instanceof Error ? result.reason.message : 'provider error'}`)
+      continue
+    }
+    if (!result.value.reachable || !result.value.cors || result.value.segment.includes('failed')) failed = true
+  }
+  if (failed) process.exitCode = 1
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Provider smoke test failed.')
   process.exitCode = 1
