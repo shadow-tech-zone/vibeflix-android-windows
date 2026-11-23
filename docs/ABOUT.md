@@ -4,23 +4,22 @@
 
 ## Purpose
 
-Vibeflix is a personal native Android app with a dark cinematic interface and a Media3-based player. The Android app remains the primary product and must keep working independently of the new Windows client and any future Windows account features.
+Vibeflix is a personal native Android app built with Java and Media3. This repository is now scoped to the mobile app and its Android release/support files.
 
-Windows development has started now, by the user's explicit decision to defer the second-Android-install restore test. The Android debug APK signed in successfully on the user's device, and live Supabase queries confirmed cloud writes, including a resumable checkpoint. Cross-device restore and real-token cross-user RLS isolation remain unverified; do not describe either as passed. The Android archive and private debug-artifact workflow passed CI run [44971555380](https://github.com/shadow-tech-zone/vibeflix-android-windows/actions/runs/44971555380). Supabase sync remains opt-in and local-first, and cloud payloads exclude stream/playback URLs and provider credentials. The fresh Windows app is a native WinUI 3/.NET shell with its own Windows playback foundation; see [`../windows/README.md`](../windows/README.md). Android remains the primary product and must continue working independently.
+The canonical source archive is [`../android/vibeflix-v31-source.zip`](../android/vibeflix-v31-source.zip). Local library state remains available when signed out or offline. Supabase library sync is optional, explicitly consented, and additive; cloud payloads exclude stream/playback URLs and provider credentials.
 
-## Current Android behavior
+## Android behavior
 
-- Home, Search, categories, My List, and local watch history
-- Two content sources presented only as **Server 1**, **Server 2**, and **Both Servers**
+- Home, Search, categories, My List, and watch history
+- Two content sources presented as **Server 1**, **Server 2**, and **Both Servers**
 - Continue Watching, per-title resume, and a hidden Continue Watching state
-- Media3 playback with episodes, a season picker, and Next Episode behavior
+- Media3 playback with seasons, episodes, and Next Episode behavior
 - Landscape playback by default; captions are off by default and can be enabled manually with CC
 
 ## What Vibeflix is not
 
 - Not a commercial product, public streaming service, or supported service
 - Not affiliated with or endorsed by Netflix or any provider
-- Not a website wrapper or WebView app
 - Not a direct TMDB API integration; provider-linked image URLs may be used for posters/backdrops
 - Not security-certified, malware-cleared, or guaranteed to play on a particular device or network
 
@@ -28,4 +27,4 @@ Use original artwork, icons, and open fonts. Do not use Netflix logos, Netflix S
 
 ## Verification limits
 
-Automated builds and offline unit tests do not prove live provider availability, playback, subtitle behavior, real-device behavior, or Play Protect status. A Play Protect warning was previously observed and remains unresolved; keep Play Protect enabled and do not advise bypassing it.
+The Android debug app has previously signed in and written library state, including a resume checkpoint. Cross-device restore and request-level cross-user RLS isolation with real Auth-issued tokens remain unverified; do not describe them as passed. The current Android UI still requires a manual “Sync library now” action; automatic queued/background sync is not implemented. Automated builds and offline unit tests do not prove live provider availability, playback, subtitle behavior, real-device behavior, or Play Protect status. A Play Protect warning was previously observed and remains unresolved; keep Play Protect enabled and do not advise bypassing it.
