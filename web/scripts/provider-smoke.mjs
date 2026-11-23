@@ -44,13 +44,19 @@ async function providerRequest(payload) {
   return body
 }
 
+function isHlsStream(stream) {
+  return stream.mimeType.toLowerCase().includes('mpegurl') || /\.m3u8(?:$|[?#])/i.test(stream.url)
+}
+
 async function probeMedia(url, mimeType, depth = 0) {
-  const isPlaylist = mimeType.toLowerCase().includes('mpegurl') || /\.m3u8(?:$|[?#])/i.test(url)
+  const isPlaylist = isHlsStream({ url, mimeType })
   let response
   try {
     response = await fetch(url, {
       headers: {
         Origin: pagesOrigin,
+        Referer: `${pagesOrigin}/`,
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         ...(isPlaylist ? {} : { Range: 'bytes=0-0' }),
       },
       signal: AbortSignal.timeout(20_000),
@@ -133,11 +139,27 @@ async function testSource(sourceIndex, label) {
     catalogPath: chosen.catalogPath,
     episodeCatalogPath,
   })
-  const stream = resolution.streams?.[0]
-  if (!stream) throw new Error(`${label} stream resolution returned no stream.`)
-  const probe = await probeMedia(stream.url, stream.mimeType)
-  console.log(`${label}: resolved ${resolution.streams.length} stream(s); media HTTP=${probe.status}; reachable=${probe.reachable}; Pages-origin CORS=${probe.cors}; ${probe.segment}.`)
-  return { label, ...probe }
+  const streams = resolution.streams || []
+  if (!streams.length) throw new Error(`${label} stream resolution returned no stream.`)
+  const candidates = streams.slice(0, 5)
+  const probes = await Promise.all(candidates.map(async (stream, index) => {
+    const requiresCors = isHlsStream(stream)
+    const probe = await probeMedia(stream.url, stream.mimeType)
+    const playable = probe.reachable && (!requiresCors || probe.cors) && !probe.segment.includes('failed')
+    console.log(`${label}: stream ${index + 1}/${streams.length}; HTTP=${probe.status}; reachable=${probe.reachable}; HLS CORS=${probe.cors}; ${probe.segment}; browser-ready=${playable}.`)
+    return { index, requiresCors, playable, probe }
+  }))
+  if (!probes.some((probe) => probe.playable)) {
+    const reasons = probes.map(({ index, requiresCors, probe }) => {
+      const issues = []
+      if (!probe.reachable) issues.push(`HTTP ${probe.status}`)
+      if (requiresCors && !probe.cors) issues.push('HLS CORS missing')
+      if (probe.segment.includes('failed')) issues.push(probe.segment)
+      return `stream ${index + 1}: ${issues.join(', ') || 'not browser-ready'}`
+    }).join('; ')
+    throw new Error(`${label} has no browser-ready stream among ${probes.length} of ${streams.length} resolved candidate(s) (${reasons}).`)
+  }
+  return { label, playable: true }
 }
 
 try {
@@ -170,14 +192,7 @@ try {
       reportFailure(`${label} live check failed: ${result.reason instanceof Error ? result.reason.message : 'provider error'}`)
       continue
     }
-    const issues = []
-    if (!result.value.reachable) issues.push(`media HTTP ${result.value.status}`)
-    if (!result.value.cors) issues.push('Pages-origin media CORS is missing')
-    if (result.value.segment.includes('failed')) issues.push(result.value.segment)
-    if (issues.length) {
-      failed = true
-      reportFailure(`${label} media check failed: ${issues.join('; ')}.`)
-    }
+    console.log(`${label}: at least one of the probed resolved streams is browser-ready.`)
   }
   if (failed) process.exitCode = 1
 } catch (error) {
