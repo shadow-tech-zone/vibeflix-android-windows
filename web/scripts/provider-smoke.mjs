@@ -3,6 +3,19 @@ const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publisha
 const endpoint = `${projectUrl}/functions/v1/vibeflix-provider`
 const pagesOrigin = 'https://shadow-tech-zone.github.io'
 
+function reportFailure(message) {
+  console.error(message)
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    const escaped = String(message)
+      .replaceAll('%', '%25')
+      .replaceAll('\r', '%0D')
+      .replaceAll('\n', '%0A')
+      .replaceAll(':', '%3A')
+      .replaceAll(',', '%2C')
+    console.log(`::error title=VibeFlix provider smoke test::${escaped}`)
+  }
+}
+
 async function providerRequest(payload) {
   let response
   try {
@@ -154,13 +167,20 @@ try {
     const label = index === 0 ? 'Server 1' : 'Server 2'
     if (result.status === 'rejected') {
       failed = true
-      console.error(`${label} live check failed: ${result.reason instanceof Error ? result.reason.message : 'provider error'}`)
+      reportFailure(`${label} live check failed: ${result.reason instanceof Error ? result.reason.message : 'provider error'}`)
       continue
     }
-    if (!result.value.reachable || !result.value.cors || result.value.segment.includes('failed')) failed = true
+    const issues = []
+    if (!result.value.reachable) issues.push(`media HTTP ${result.value.status}`)
+    if (!result.value.cors) issues.push('Pages-origin media CORS is missing')
+    if (result.value.segment.includes('failed')) issues.push(result.value.segment)
+    if (issues.length) {
+      failed = true
+      reportFailure(`${label} media check failed: ${issues.join('; ')}.`)
+    }
   }
   if (failed) process.exitCode = 1
 } catch (error) {
-  console.error(error instanceof Error ? error.message : 'Provider smoke test failed.')
+  reportFailure(error instanceof Error ? error.message : 'Provider smoke test failed.')
   process.exitCode = 1
 }
