@@ -185,6 +185,8 @@
 .video-error > span { max-width: 450px; color: #c4ada9; font-size: 11px; line-height: 1.5; }
 .video-error .button { min-height: 35px; }
 .player-dialog__foot { display: flex; align-items: center; justify-content: space-between; gap: 15px; min-height: 52px; padding: 8px 20px; color: #747781; font-family: var(--mono); font-size: 8px; }
+.player-source-attribution { color: #aeb0b6; line-height: 1.5; }
+.player-dialog__foot a { color: #ff9288; text-decoration: underline; text-underline-offset: 2px; }
 .player-episode-nav { display: inline-flex; align-items: center; gap: 9px; }
 .player-episode-nav button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 0 9px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 4px; background: #181a1f; color: #d0d1d4; font-family: 'DM Sans', sans-serif; font-size: 9px; cursor: pointer; }
 .player-episode-nav button:not(:disabled):hover { border-color: rgba(255, 255, 255, .3); color: white; }

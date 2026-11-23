@@ -928,6 +928,7 @@ function App() {
       : page === 'History'
         ? ['No viewing history yet.', 'Titles you finish will appear here.']
         : ['No titles are available in this view.', 'Try another source or filter, or check again later.']
+  const playerOpenMovie = player ? openMovieForTitle(player.title.id) : undefined
   const playerEpisodeIndex = player?.episode
     ? player.episodes.findIndex((episode) => episode.number === player.episode?.number)
     : -1
@@ -1139,7 +1140,13 @@ function App() {
               )}
             </div>
             <div className="player-dialog__foot">
-              <span>Stream URLs are used only in memory and are not saved in this browser.</span>
+              {playerOpenMovie ? (
+                <span className="player-source-attribution">
+                  {playerOpenMovie.attribution} · <a href={playerOpenMovie.licenseUrl} target="_blank" rel="noopener noreferrer">CC BY 3.0</a> · <a href={playerOpenMovie.stream.url} target="_blank" rel="noopener noreferrer">Open direct MP4</a>
+                </span>
+              ) : (
+                <span>Resolved provider URLs are not stored in your local library.</span>
+              )}
               {player.episode && (
                 <div className="player-episode-nav" aria-label="Episode navigation">
                   <button type="button" onClick={() => void changePlayerEpisode(-1)} disabled={!canNavigatePlayerPrevious || playbackLoading} aria-label="Play previous episode"><ChevronLeft size={15} /> Previous</button>
