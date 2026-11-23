@@ -17,6 +17,10 @@ namespace VibeFlix.Windows;
 public sealed partial class MainWindow
 {
     private readonly Dictionary<string, BitmapImage?> _artworkCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string?> _heroBackdropCache = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _heroBackdropLookupsStarted = new(StringComparer.Ordinal);
+    private Border? _activeHero;
+    private string? _activeHeroTitleId;
 
     private double PageViewportWidth => PageScrollViewer.ActualWidth > 0
         ? PageScrollViewer.ActualWidth
@@ -168,12 +172,56 @@ public sealed partial class MainWindow
         copy.Children.Add(actions);
         heroGrid.Children.Add(copy);
         AutomationProperties.SetName(hero, $"Featured title: {featured.Name}");
+        _activeHero = hero;
+        _activeHeroTitleId = featured.Id;
+        if (_heroBackdropCache.TryGetValue(featured.Id, out var cachedBackdrop))
+        {
+            if (!string.IsNullOrWhiteSpace(cachedBackdrop))
+            {
+                hero.Background = CreateHeroBackground(featured, cachedBackdrop);
+            }
+        }
+        else if (_heroBackdropLookupsStarted.Add(featured.Id))
+        {
+            _ = LoadHeroBackdropAsync(featured);
+        }
+
         return hero;
     }
 
-    private Microsoft.UI.Xaml.Media.Brush CreateHeroBackground(CatalogTitle featured)
+    private async Task LoadHeroBackdropAsync(CatalogTitle title)
     {
-        if (LoadArtworkForTitle(featured) is { } artwork)
+        try
+        {
+            var details = await _catalogSources.LoadDetailsAsync(title);
+            if (_windowClosed)
+            {
+                return;
+            }
+
+            var backdropUrl = string.IsNullOrWhiteSpace(details.BackdropUrl) ? null : details.BackdropUrl;
+            _heroBackdropCache[title.Id] = backdropUrl;
+            if (backdropUrl is not null
+                && string.Equals(_activeHeroTitleId, title.Id, StringComparison.Ordinal)
+                && _activeHero is { } hero)
+            {
+                hero.Background = CreateHeroBackground(title, backdropUrl);
+            }
+        }
+        catch (Exception)
+        {
+            if (!_windowClosed)
+            {
+                _heroBackdropCache[title.Id] = null;
+            }
+        }
+    }
+
+    private Microsoft.UI.Xaml.Media.Brush CreateHeroBackground(CatalogTitle featured, string? backdropUrl = null)
+    {
+        var artwork = string.IsNullOrWhiteSpace(backdropUrl) ? null : LoadArtworkFromUrl(backdropUrl);
+        artwork ??= LoadArtworkForTitle(featured);
+        if (artwork is not null)
         {
             return new ImageBrush
             {
@@ -192,9 +240,10 @@ public sealed partial class MainWindow
         return gradient;
     }
 
-    private BitmapImage? LoadArtworkForTitle(CatalogTitle title)
+    private BitmapImage? LoadArtworkForTitle(CatalogTitle title) => LoadArtworkFromUrl(title.PosterUrl);
+
+    private BitmapImage? LoadArtworkFromUrl(string? address)
     {
-        var address = title.PosterUrl;
         if (string.IsNullOrWhiteSpace(address)
             || !Uri.TryCreate(address, UriKind.Absolute, out var uri)
             || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)

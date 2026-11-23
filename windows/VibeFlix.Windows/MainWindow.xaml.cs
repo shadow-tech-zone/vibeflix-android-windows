@@ -435,6 +435,8 @@ public sealed partial class MainWindow : Window
         }
 
         _rendering = true;
+        _activeHero = null;
+        _activeHeroTitleId = null;
         try
         {
             PageContent.Children.Clear();
