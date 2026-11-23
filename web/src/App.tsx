@@ -288,13 +288,17 @@ function DetailsDialog({
               {metadata.filter((part) => part !== title.source).map((part) => <span key={part}>{part}</span>)}
             </div>
             <p className="details-synopsis">{details?.synopsis || title.synopsis || 'Details are supplied by the selected catalog source.'}</p>
-            {openMovie && (
+            {openMovie ? (
               <div className="open-license-details">
                 <p>{openMovie.attribution} is shared under the Creative Commons Attribution 3.0 license.</p>
                 <a href={openMovie.licenseUrl} target="_blank" rel="noopener noreferrer">License</a>
                 <span aria-hidden="true">·</span>
                 <a href={openMovie.sourceUrl} target="_blank" rel="noopener noreferrer">Official film page</a>
               </div>
+            ) : (
+              <p className="provider-browser-note" role="note">
+                Server 1 and Server 2 streams play in a browser only when their host permits direct access and CORS. A browser cannot reuse the Android player’s custom Referer/Origin headers.
+              </p>
             )}
             {(details?.genres?.length ?? title.genres.length) > 0 && (
               <p className="details-genres"><b>Genres</b> {(details?.genres?.length ? details.genres : title.genres).join(' · ')}</p>
@@ -707,6 +711,16 @@ function App() {
     setPlaybackLoading(false)
     window.requestAnimationFrame(() => returnFocusRef.current?.focus())
   }, [player, saveVideoProgress])
+
+  const browseBrowserReadyMovies = useCallback(() => {
+    closePlayer()
+    setSource('Open Movies')
+    setFilter('All')
+    setCatalogPage(1)
+    setQuery('')
+    setSubmittedQuery('')
+    setPage('Home')
+  }, [closePlayer])
 
   const changePlayerEpisode = useCallback(async (direction: -1 | 1) => {
     if (!player?.episode) return
@@ -1135,6 +1149,9 @@ function App() {
                   </button>
                   {player.streamIndex + 1 < player.streams.length && (
                     <button type="button" className="button button--secondary" onClick={() => setPlayer((current) => current ? { ...current, streamIndex: current.streamIndex + 1 } : null)}>Try another stream</button>
+                  )}
+                  {player.title.source !== 'Open Movies' && (
+                    <button type="button" className="button button--secondary" onClick={browseBrowserReadyMovies}>Browse Open Movies</button>
                   )}
                 </div>
               )}

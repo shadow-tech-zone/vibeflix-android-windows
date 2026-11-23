@@ -145,6 +145,7 @@
 .open-license-details { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; margin: -3px 0 13px; color: #aeb0b6; font-size: 10px; line-height: 1.5; }
 .open-license-details p { flex-basis: 100%; margin: 0; }
 .open-license-details a { color: #ff9288; text-decoration: underline; text-underline-offset: 2px; }
+.provider-browser-note { max-width: 600px; margin: -3px 0 13px; padding: 9px 11px; border-left: 2px solid #d6a25e; background: rgba(214, 162, 94, .075); color: #c9b9a2; font-size: 10px; line-height: 1.5; }
 .details-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 20px 0 23px; }
 .details-actions .button { min-height: 40px; }
 .subtle-status { display: flex; align-items: center; gap: 7px; color: #a7a9b0; font-size: 11px; }
