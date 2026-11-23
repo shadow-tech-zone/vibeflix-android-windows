@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -43,13 +43,21 @@ function CatalogHeading({ title, compact }) {
 export default function App() {
   const { width } = useWindowDimensions();
   const compact = width < 760;
+  const pageScrollRef = useRef(null);
   const [activeTab, setActiveTab] = useState("Home");
   const [profile, setProfile] = useState("Sam");
+  const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [playingItem, setPlayingItem] = useState(null);
   const { savedSet, toggleSaved } = useMyList();
+
+  const scrollPageToTop = () => {
+    const pageScroll = pageScrollRef.current;
+    const node = pageScroll?.getScrollableNode?.() ?? pageScroll;
+    if (node?.scrollTop > 0) pageScroll.scrollTo({ y: 0, animated: true });
+  };
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -61,6 +69,7 @@ export default function App() {
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        scrollPageToTop();
         setSearchOpen(true);
       }
     };
@@ -107,13 +116,25 @@ export default function App() {
     return buildHomeRows(profileCatalog, profile);
   }, [activeTab, profile, profileCatalog, query, visibleItems]);
 
+  const handlePageScroll = (event) => {
+    const scrollY =
+      event?.nativeEvent?.contentOffset?.y ??
+      event?.target?.scrollTop ??
+      event?.currentTarget?.scrollTop ??
+      0;
+    const nextScrolled = scrollY > 36;
+    setScrolled((current) => (current === nextScrolled ? current : nextScrolled));
+  };
+
   const handleTabChange = (tab) => {
+    scrollPageToTop();
     setActiveTab(tab);
     setSearchOpen(false);
     setQuery("");
   };
 
   const handleProfileChange = (name) => {
+    scrollPageToTop();
     setProfile(name);
     setActiveTab("Home");
     setSearchOpen(false);
@@ -125,6 +146,7 @@ export default function App() {
       setSearchOpen(false);
       setQuery("");
     } else {
+      scrollPageToTop();
       setSearchOpen(true);
     }
   };
@@ -136,6 +158,7 @@ export default function App() {
 
   const navigationProps = {
     activeTab,
+    scrolled,
     onTabChange: handleTabChange,
     profile,
     onProfileChange: handleProfileChange,
@@ -155,8 +178,11 @@ export default function App() {
 
   return (
     <ScrollView
+      ref={pageScrollRef}
       style={styles.appRoot}
       contentContainerStyle={styles.pageContent}
+      onScroll={handlePageScroll}
+      scrollEventThrottle={64}
       showsVerticalScrollIndicator={false}
     >
       {isHome ? (

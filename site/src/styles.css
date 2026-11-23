@@ -41,3 +41,28 @@ button {
     height: 0;
   }
 }
+
+#vibeflix-navigation {
+  transition: background-color 220ms ease, border-color 220ms ease;
+}
+
+[data-testid="media-rail-controls"] {
+  transition: opacity 160ms ease;
+}
+
+[data-testid="media-rail-arrow"]:hover {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  background-color: rgba(229, 9, 20, 0.92) !important;
+}
+
+[data-testid="media-rail-arrow"]:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #vibeflix-navigation,
+  [data-testid="media-rail-controls"] {
+    transition: none;
+  }
+}

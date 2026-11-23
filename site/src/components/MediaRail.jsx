@@ -64,7 +64,19 @@ function MediaCard({ item, compact, onSelect }) {
 
 export default function MediaRail({ title, items, compact, onSelect }) {
   const railRef = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasFocusedArrow, setHasFocusedArrow] = useState(false);
+  const controlsVisible = isHovered || hasFocusedArrow;
   if (!items.length) return null;
+
+  const scrollRail = (direction) => {
+    const rail = railRef.current;
+    const node = rail?.getScrollableNode?.() ?? rail;
+    if (!rail || !node) return;
+
+    const step = Math.max(node.clientWidth * 0.82, 300);
+    rail.scrollTo({ x: Math.max(0, node.scrollLeft + direction * step), animated: true });
+  };
 
   return (
     <View style={styles.section}>
@@ -82,16 +94,61 @@ export default function MediaRail({ title, items, compact, onSelect }) {
           <Text style={styles.exploreArrow}>›</Text>
         </Pressable>
       </View>
-      <ScrollView
-        ref={railRef}
-        contentContainerStyle={[styles.railContent, compact && styles.railContentCompact]}
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <View
+        testID="media-rail-container"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={[styles.railContainer, compact && styles.railContainerCompact]}
       >
-        {items.map((item) => (
-          <MediaCard key={item.id} item={item} compact={compact} onSelect={onSelect} />
-        ))}
-      </ScrollView>
+        <ScrollView
+          ref={railRef}
+          contentContainerStyle={[styles.railContent, compact && styles.railContentCompact]}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          {items.map((item) => (
+            <MediaCard key={item.id} item={item} compact={compact} onSelect={onSelect} />
+          ))}
+        </ScrollView>
+        <View
+          testID="media-rail-controls"
+          pointerEvents={controlsVisible ? "box-none" : "none"}
+          style={[
+            styles.railControls,
+            controlsVisible && styles.railControlsVisible,
+            compact && styles.railControlsCompact,
+          ]}
+        >
+          <Pressable
+            accessibilityLabel={`Scroll ${title} left`}
+            accessibilityRole="button"
+            testID="media-rail-arrow"
+            onFocus={() => setHasFocusedArrow(true)}
+            onBlur={(event) => {
+              const controls = event.currentTarget?.parentElement;
+              if (!controls?.contains(event.relatedTarget)) setHasFocusedArrow(false);
+            }}
+            onPress={() => scrollRail(-1)}
+            style={[styles.railControl, styles.railControlLeft]}
+          >
+            <Text style={styles.railControlText}>‹</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={`Scroll ${title} right`}
+            accessibilityRole="button"
+            testID="media-rail-arrow"
+            onFocus={() => setHasFocusedArrow(true)}
+            onBlur={(event) => {
+              const controls = event.currentTarget?.parentElement;
+              if (!controls?.contains(event.relatedTarget)) setHasFocusedArrow(false);
+            }}
+            onPress={() => scrollRail(1)}
+            style={[styles.railControl, styles.railControlRight]}
+          >
+            <Text style={styles.railControlText}>›</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -105,6 +162,15 @@ const styles = StyleSheet.create({
   exploreButton: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 4 },
   exploreText: { color: "#b3b3b3", fontFamily: "Arial", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
   exploreArrow: { color: "#b3b3b3", fontFamily: "Arial", fontSize: 17, lineHeight: 20 },
+  railContainer: { position: "relative", minHeight: 180 },
+  railContainerCompact: { minHeight: 149 },
+  railControls: { position: "absolute", zIndex: 6, top: 0, right: 0, bottom: 0, left: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 2, opacity: 0 },
+  railControlsVisible: { opacity: 1 },
+  railControlsCompact: { display: "none" },
+  railControl: { width: 38, height: 68, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 3, backgroundColor: "rgba(20,20,20,0.86)" },
+  railControlLeft: { marginLeft: 2 },
+  railControlRight: { marginRight: 2 },
+  railControlText: { color: COLORS.white, fontFamily: "Arial", fontSize: 34, fontWeight: "400", lineHeight: 40 },
   railContent: { gap: 10, paddingHorizontal: PAGE_GUTTER, paddingTop: 5, paddingBottom: 8 },
   railContentCompact: { gap: 8, paddingHorizontal: 20 },
   card: { width: 232, overflow: "hidden", borderRadius: 4, backgroundColor: COLORS.surface, transform: [{ scale: 1 }], zIndex: 1 },

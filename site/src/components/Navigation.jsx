@@ -15,6 +15,7 @@ const PROFILES = ["Sam", "Kids"];
 export default function Navigation({
   activeTab,
   compact,
+  scrolled,
   onTabChange,
   profile,
   onProfileChange,
@@ -38,7 +39,10 @@ export default function Navigation({
   };
 
   return (
-    <View style={[styles.header, compact && styles.headerCompact]}>
+    <View
+      nativeID="vibeflix-navigation"
+      style={[styles.header, compact && styles.headerCompact, scrolled && styles.headerScrolled]}
+    >
       <View style={styles.headerLeft}>
         <Brand compact={compact} />
         {!compact && (
@@ -185,7 +189,7 @@ export default function Navigation({
 
 const styles = StyleSheet.create({
   header: {
-    position: "absolute",
+    position: "fixed",
     zIndex: 20,
     top: 0,
     left: 0,
@@ -197,6 +201,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "rgba(20,20,20,0.56)",
+  },
+  headerScrolled: {
+    backgroundColor: "rgba(20,20,20,0.97)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
   headerCompact: { minHeight: 61, paddingHorizontal: 17, paddingVertical: 10 },
   headerLeft: { minWidth: 0, flexDirection: "row", alignItems: "center", gap: 35, flex: 1 },
