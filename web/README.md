@@ -21,4 +21,6 @@ npm run build
 
 `npm run build` emits a project-Pages build under `dist/`. Vite loads `hls.js` only when an HLS stream is selected. `scripts/provider-smoke.mjs` is an explicit live smoke test used only by manual GitHub Actions dispatches; it reports provider/catalog and media CORS outcomes without printing or saving resolved stream URLs.
 
+Choose **Open Movies** in the catalog source menu for a browser-ready, openly licensed film: Big Buck Bunny, played as a direct MP4 from the Blender Foundation and attributed under CC BY 3.0. The shortcut route is `/?source=open#browse`. This source does not use a media relay or provider-header workaround. Server 1 and Server 2 remain separate catalog/resolver options; their streams play in a browser only when the upstream permits direct access and satisfies browser CORS rules.
+
 The My List, watch history, and resume checkpoint data are stored locally in browser storage. Resolved stream URLs are runtime-only memory state. Provider access and browser playback remain subject to live upstream availability, provider headers, and CORS.

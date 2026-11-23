@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { providerApi, ProviderApiError, sourceIndex } from './api'
+import { browseOpenMovies, openMovieForTitle } from './openMovies'
 import {
   libraryTitles,
   progressForTitle,
@@ -31,7 +32,7 @@ import type {
   LibraryState,
   MediaEpisode,
   MediaSeason,
-  ProviderSource,
+  CatalogSource,
   ResolvedStream,
   TitleDetails,
 } from './types'
@@ -40,7 +41,13 @@ import './App.css'
 const FILTERS = ['All', 'Movies', 'Series', 'Latest', 'Hindi'] as const
 type BrowseFilter = typeof FILTERS[number]
 type PageName = 'Home' | 'Search' | 'My List' | 'Continue Watching' | 'History'
-type SourceChoice = 'Both Servers' | ProviderSource
+type SourceChoice = 'Both Servers' | CatalogSource
+
+function initialSource(): SourceChoice {
+  return new URLSearchParams(window.location.search).get('source') === 'open'
+    ? 'Open Movies'
+    : 'Both Servers'
+}
 
 type PlayerState = {
   key: string
@@ -109,6 +116,12 @@ function TitleCard({
         <div className="poster-art">
           {title.posterUrl && failedPosterUrl !== title.posterUrl ? (
             <img src={title.posterUrl} alt={`${title.name} poster`} loading="lazy" onError={() => setFailedPosterUrl(title.posterUrl)} />
+          ) : title.source === 'Open Movies' ? (
+            <div className="poster-art__open-movie" aria-hidden="true">
+              <span className="poster-art__open-badge">OPEN FILM</span>
+              <strong>{title.name}</strong>
+              <span className="poster-art__open-license">CC BY 3.0 · BLENDER</span>
+            </div>
           ) : (
             <div className="poster-art__fallback" aria-hidden="true"><span>V</span></div>
           )}
@@ -226,6 +239,7 @@ function DetailsDialog({
   const dialogRef = useRef<HTMLElement>(null)
   useEffect(() => { closeRef.current?.focus() }, [])
   const metadata = titleMetadata({ ...title, ...details })
+  const openMovie = openMovieForTitle(title.id)
   const selectedSeasonRecord = seasons.find((season) => season.number === selectedSeason)
   return (
     <div
@@ -257,7 +271,15 @@ function DetailsDialog({
         <button ref={closeRef} type="button" className="dialog-close" onClick={onClose} aria-label="Close title details"><X size={20} /></button>
         <div className="details-dialog__body">
           <div className="details-poster">
-            {title.posterUrl && <img src={title.posterUrl} alt={`${title.name} poster`} />}
+            {title.posterUrl ? (
+              <img src={title.posterUrl} alt={`${title.name} poster`} />
+            ) : openMovie ? (
+              <div className="details-poster__open">
+                <span>OPEN MOVIE</span>
+                <strong>{title.name}</strong>
+                <small>BLENDER FOUNDATION · CC BY 3.0</small>
+              </div>
+            ) : null}
           </div>
           <div className="details-copy">
             <span className="eyebrow">{title.source} <span>·</span> VIBEFLIX</span>
@@ -266,6 +288,14 @@ function DetailsDialog({
               {metadata.filter((part) => part !== title.source).map((part) => <span key={part}>{part}</span>)}
             </div>
             <p className="details-synopsis">{details?.synopsis || title.synopsis || 'Details are supplied by the selected catalog source.'}</p>
+            {openMovie && (
+              <div className="open-license-details">
+                <p>{openMovie.attribution} is shared under the Creative Commons Attribution 3.0 license.</p>
+                <a href={openMovie.licenseUrl} target="_blank" rel="noopener noreferrer">License</a>
+                <span aria-hidden="true">·</span>
+                <a href={openMovie.sourceUrl} target="_blank" rel="noopener noreferrer">Official film page</a>
+              </div>
+            )}
             {(details?.genres?.length ?? title.genres.length) > 0 && (
               <p className="details-genres"><b>Genres</b> {(details?.genres?.length ? details.genres : title.genres).join(' · ')}</p>
             )}
@@ -335,14 +365,14 @@ function DetailsDialog({
 function App() {
   const [library, setLibrary] = useState<LibraryState>(readLibrary)
   const [showWelcome, setShowWelcome] = useState(() => window.location.hash !== '#browse')
-  const [source, setSource] = useState<SourceChoice>('Both Servers')
+  const [source, setSource] = useState<SourceChoice>(initialSource)
   const [filter, setFilter] = useState<BrowseFilter>('All')
   const [page, setPage] = useState<PageName>('Home')
   const [query, setQuery] = useState('')
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [catalogPage, setCatalogPage] = useState(1)
   const [refreshToken, setRefreshToken] = useState(0)
-  const [catalog, setCatalog] = useState<CatalogTitle[]>([])
+  const [providerCatalog, setProviderCatalog] = useState<CatalogTitle[]>([])
   const [hasNext, setHasNext] = useState(false)
   const [catalogStatus, setCatalogStatus] = useState<{ key: string; error: string | null; warnings: string[] } | null>(null)
   const [activeTitle, setActiveTitle] = useState<CatalogTitle | null>(null)
@@ -369,9 +399,13 @@ function App() {
   const episodesRequest = useRef<AbortController | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const catalogRequestKey = JSON.stringify([source, filter, submittedQuery, catalogPage, refreshToken])
-  const loading = catalogStatus?.key !== catalogRequestKey
-  const catalogError = catalogStatus?.key === catalogRequestKey ? catalogStatus.error : null
-  const sourceWarnings = catalogStatus?.key === catalogRequestKey ? catalogStatus.warnings : []
+  const catalog = useMemo(
+    () => source === 'Open Movies' ? browseOpenMovies(filter, submittedQuery) : providerCatalog,
+    [source, filter, submittedQuery, providerCatalog],
+  )
+  const loading = source !== 'Open Movies' && catalogStatus?.key !== catalogRequestKey
+  const catalogError = source === 'Open Movies' ? null : catalogStatus?.key === catalogRequestKey ? catalogStatus.error : null
+  const sourceWarnings = source === 'Open Movies' ? [] : catalogStatus?.key === catalogRequestKey ? catalogStatus.warnings : []
   const currentEpisodeRequestKey = activeTitle?.kind === 'Series' && selectedSeason
     ? `${activeTitle.id}:${selectedSeason}`
     : ''
@@ -397,6 +431,7 @@ function App() {
 
   useEffect(() => {
     pageRequest.current?.abort()
+    if (source === 'Open Movies') return
     const controller = new AbortController()
     pageRequest.current = controller
     providerApi.browse({
@@ -406,7 +441,7 @@ function App() {
       page: catalogPage,
     }, controller.signal)
       .then((result) => {
-        setCatalog((current) => catalogPage > 1 ? [...current, ...result.titles.filter((item) => !current.some((seen) => seen.id === item.id))] : result.titles)
+        setProviderCatalog((current) => catalogPage > 1 ? [...current, ...result.titles.filter((item) => !current.some((seen) => seen.id === item.id))] : result.titles)
         setHasNext(result.hasNext)
         const warnings = [
           result.server1Unavailable ? 'Server 1 is unavailable.' : '',
@@ -418,7 +453,7 @@ function App() {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
-        if (catalogPage === 1) setCatalog([])
+        if (catalogPage === 1) setProviderCatalog([])
         setHasNext(false)
         setCatalogStatus({ key: catalogRequestKey, error: errorText(error), warnings: [] })
       })
@@ -429,7 +464,7 @@ function App() {
   const heroBackdrop = featured?.backdropUrl
     || (heroArtwork?.titleId === featured?.id ? heroArtwork.url : '')
   useEffect(() => {
-    if (!featured || featured.backdropUrl) return
+    if (!featured || featured.source === 'Open Movies' || featured.backdropUrl) return
     const controller = new AbortController()
     providerApi.details(featured, controller.signal)
       .then((result) => setHeroArtwork({ titleId: featured.id, url: result.backdropUrl || featured.posterUrl }))
@@ -470,6 +505,18 @@ function App() {
     setSelectedEpisodeState(null)
     setSelectedSeason(0)
     setDetailsLoading(true)
+    if (title.source === 'Open Movies') {
+      const movie = openMovieForTitle(title.id)
+      if (!movie) {
+        setDetailsLoading(false)
+        setDetailsError('This open movie is no longer available in the catalog.')
+        return
+      }
+      setDetails(movie.details)
+      setLibrary((current) => rememberTitles(current, [title]))
+      setDetailsLoading(false)
+      return
+    }
     const controller = new AbortController()
     detailsRequest.current = controller
     void providerApi.details(title, controller.signal)
@@ -533,8 +580,15 @@ function App() {
     setResolving(true)
     setDetailsError(null)
     try {
-      const result = await providerApi.resolve(activeTitle, selectedEpisode?.catalogPath)
-      if (!result.streams.length) throw new ProviderApiError('No playable stream was returned by the provider.')
+      let streams: ResolvedStream[]
+      if (activeTitle.source === 'Open Movies') {
+        const movie = openMovieForTitle(activeTitle.id)
+        if (!movie) throw new ProviderApiError('This open movie is no longer available in the catalog.')
+        streams = [movie.stream]
+      } else {
+        streams = (await providerApi.resolve(activeTitle, selectedEpisode?.catalogPath)).streams
+      }
+      if (!streams.length) throw new ProviderApiError('No playable stream was returned by the provider.')
       const episodeKey = selectedEpisode ? `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode.number).padStart(2, '0')}` : ''
       const progress = progressForTitle(library, activeTitle.id).find((entry) => entry.episodeKey === episodeKey)
       const final = activeTitle.kind === 'Movie' || isFinalEpisode(selectedEpisode)
@@ -547,7 +601,7 @@ function App() {
         episodes: selectedEpisode ? [...episodes].sort((a, b) => a.number - b.number) : [],
         seasons: selectedEpisode ? seasons : [],
         resumeSeconds: progress?.positionSeconds ?? 0,
-        streams: result.streams,
+        streams,
         streamIndex: 0,
         isFinalTitle: final,
       })
@@ -582,7 +636,9 @@ function App() {
     const onCanPlay = () => setPlaybackLoading(false)
     const onError = () => {
       setPlaybackLoading(false)
-      setPlaybackError('The stream could not be played. The provider may be unavailable, require headers the browser cannot send, block this page with CORS, or use an unsupported codec.')
+      setPlaybackError(selectedStream.server.includes('Open movie')
+        ? 'The direct open-license MP4 could not be loaded from its host. Check your network and try again; VibeFlix does not proxy this media.'
+        : 'The stream could not be played. The provider may be unavailable, require headers the browser cannot send, block this page with CORS, or use an unsupported codec.')
     }
     const onPlaybackProblem = (event: Event) => {
       setPlaybackLoading(false)
@@ -808,7 +864,7 @@ function App() {
       </a>
       <nav className="main-nav" aria-label="Main navigation">
         <button type="button" className={page === 'Home' && filter === 'All' ? 'is-active' : ''} onClick={() => { setFilter('All'); goTo('Home') }}>Home</button>
-        <button type="button" className={filter === 'Series' ? 'is-active' : ''} onClick={() => goTo('Series')}>Series</button>
+        {source !== 'Open Movies' && <button type="button" className={filter === 'Series' ? 'is-active' : ''} onClick={() => goTo('Series')}>Series</button>}
         <button type="button" className={filter === 'Movies' ? 'is-active' : ''} onClick={() => goTo('Movies')}>Movies</button>
         <button type="button" className={page === 'My List' ? 'is-active' : ''} onClick={() => goTo('My List')}>My List</button>
         <button type="button" className={page === 'Continue Watching' ? 'is-active' : ''} onClick={() => goTo('Continue Watching')}>Continue</button>
@@ -830,8 +886,13 @@ function App() {
         </label>
         <label className="source-select">
           <span className="sr-only">Catalog source</span>
-          <select value={source} onChange={(event) => { setCatalogPage(1); setSource(event.target.value as SourceChoice) }}>
-            <option>Both Servers</option><option>Server 1</option><option>Server 2</option>
+          <select value={source} onChange={(event) => {
+            setCatalogPage(1)
+            setFilter('All')
+            setSource(event.target.value as SourceChoice)
+            setPage('Home')
+          }}>
+            <option>Both Servers</option><option>Server 1</option><option>Server 2</option><option>Open Movies</option>
           </select>
           <ChevronDown size={14} aria-hidden="true" />
         </label>
@@ -916,7 +977,7 @@ function App() {
           {page === 'Home' && (
             <div className="browse-toolbar">
               <div className="filter-chips" role="group" aria-label="Browse catalog filter">
-                {FILTERS.map((item) => (
+                {(source === 'Open Movies' ? FILTERS.filter((item) => item === 'All' || item === 'Movies') : FILTERS).map((item) => (
                   <button type="button" key={item} className={`filter-chip${filter === item ? ' is-active' : ''}`} onClick={() => { setCatalogPage(1); setFilter(item); setPage('Home') }} aria-pressed={filter === item}>{item}</button>
                 ))}
               </div>
@@ -924,6 +985,11 @@ function App() {
                 <span className={`source-status__dot${sourceWarnings.length ? ' is-warning' : ''}`} />
                 {loading ? 'Connecting to catalog sources' : sourceWarnings.length ? sourceWarnings.join(' · ') : `Browsing ${source}`}
               </div>
+              {source === 'Open Movies' && (
+                <p className="open-movie-note">
+                  Browser-ready, openly licensed direct MP4s. Server 1 and Server 2 stay available separately; their own CORS and access rules still apply.
+                </p>
+              )}
             </div>
           )}
 
@@ -934,12 +1000,18 @@ function App() {
             <TitleRow title="My List" titles={savedTitles.slice(0, 12)} library={library} onOpen={openTitle} onToggleSaved={toggleTitleSaved} />
           )}
 
-          {(page === 'Home' || page === 'Search') && !loading && catalog.length > 0 && (
+          {page === 'Home' && !loading && catalog.length > 0 && (
             <>
-              <TitleRow title={filter === 'All' ? 'Explore titles' : `${filter} titles`} titles={catalog.slice(1)} library={library} onOpen={openTitle} onToggleSaved={toggleTitleSaved} />
-              {filter === 'All' && movies.length > 0 && <TitleRow title="Movies" titles={movies} library={library} onOpen={openTitle} onToggleSaved={toggleTitleSaved} />}
-              {filter === 'All' && series.length > 0 && <TitleRow title="Series" titles={series} library={library} onOpen={openTitle} onToggleSaved={toggleTitleSaved} />}
-              {hasNext && <div className="pagination"><button type="button" className="button button--secondary" onClick={() => setCatalogPage((current) => current + 1)}>Browse more <ChevronRight size={16} /></button></div>}
+              <TitleRow
+                title={source === 'Open Movies' ? 'Open-license movies' : filter === 'All' ? 'Explore titles' : `${filter} titles`}
+                titles={source === 'Open Movies' ? catalog : catalog.slice(1)}
+                library={library}
+                onOpen={openTitle}
+                onToggleSaved={toggleTitleSaved}
+              />
+              {source !== 'Open Movies' && filter === 'All' && movies.length > 0 && <TitleRow title="Movies" titles={movies} library={library} onOpen={openTitle} onToggleSaved={toggleTitleSaved} />}
+              {source !== 'Open Movies' && filter === 'All' && series.length > 0 && <TitleRow title="Series" titles={series} library={library} onOpen={openTitle} onToggleSaved={toggleTitleSaved} />}
+              {source !== 'Open Movies' && hasNext && <div className="pagination"><button type="button" className="button button--secondary" onClick={() => setCatalogPage((current) => current + 1)}>Browse more <ChevronRight size={16} /></button></div>}
             </>
           )}
 
@@ -1037,13 +1109,34 @@ function App() {
                 playsInline
                 autoPlay
                 aria-label={`Video player for ${player.episode?.name || player.title.name}`}
+                onPlay={() => setPlaybackError(null)}
                 onTimeUpdate={(event) => saveVideoProgress(event.currentTarget)}
                 onEnded={(event) => {
                   updateLibrary((current) => saveProgress(current, player.title, player.episodeKey, event.currentTarget.duration, event.currentTarget.duration, player.isFinalTitle))
                 }}
               />
               {playbackLoading && <div className="video-status"><LoaderCircle className="spin" size={28} /><span>Preparing player…</span></div>}
-              {playbackError && <div className="video-error" role="alert"><strong>Playback problem</strong><span>{playbackError}</span>{player.streamIndex + 1 < player.streams.length && <button type="button" className="button button--secondary" onClick={() => setPlayer((current) => current ? { ...current, streamIndex: current.streamIndex + 1 } : null)}>Try another stream</button>}</div>}
+              {playbackError && (
+                <div className="video-error" role="alert">
+                  <strong>Playback problem</strong>
+                  <span>{playbackError}</span>
+                  <button
+                    type="button"
+                    className="button button--primary"
+                    onClick={() => {
+                      const video = videoRef.current
+                      if (!video) return
+                      setPlaybackError(null)
+                      void video.play().catch(() => setPlaybackError('Playback is still blocked. Use the video controls or check the source and network.'))
+                    }}
+                  >
+                    Play video
+                  </button>
+                  {player.streamIndex + 1 < player.streams.length && (
+                    <button type="button" className="button button--secondary" onClick={() => setPlayer((current) => current ? { ...current, streamIndex: current.streamIndex + 1 } : null)}>Try another stream</button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="player-dialog__foot">
               <span>Stream URLs are used only in memory and are not saved in this browser.</span>

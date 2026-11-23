@@ -1,4 +1,5 @@
 export type ProviderSource = 'Server 1' | 'Server 2'
+export type CatalogSource = ProviderSource | 'Open Movies'
 export type CatalogKind = 'Movie' | 'Series'
 
 export interface CatalogTitle {
@@ -10,7 +11,7 @@ export interface CatalogTitle {
   runtimeMinutes: number
   synopsis: string
   language: string
-  source: ProviderSource
+  source: CatalogSource
   genres: string[]
   isNew: boolean
   catalogPath: string
