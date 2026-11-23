@@ -7,7 +7,7 @@ A personal, responsive React Native Web prototype that follows the familiar dark
 - React 19 + React Native Web components for consistent responsive UI primitives.
 - Vite 8 for development and production builds; versions were checked against the npm registry before this pass and are already current.
 - `src/data/catalog.js` owns fictional title metadata and row composition.
-- `src/components/` contains isolated navigation, spotlight, rails, cards, details, and playback-shell components. The fixed navigation gains a darker surface as you scroll; desktop rails expose keyboard-accessible arrow controls while mobile keeps swipe navigation.
+- `src/components/` contains isolated navigation, spotlight, rails, cards, details, and playback-shell components. TV Shows and Movies compose separate genre rails; New & Popular groups trending, recent, and type-specific picks. The fixed navigation darkens on scroll, while desktop rails expose keyboard-accessible arrows and mobile keeps swipe navigation.
 - `src/hooks/useMyList.js` owns the browser-persisted watchlist state.
 - A root render error boundary shows a recovery view instead of leaving an empty page.
 

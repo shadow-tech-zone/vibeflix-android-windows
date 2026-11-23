@@ -139,6 +139,56 @@ export const CATALOG = [
 
 export const FEATURED_TITLE_ID = "quiet-hour";
 
+const TYPE_GENRE_SECTIONS = {
+  Series: [
+    { id: "series-mystery", title: "Mystery & Suspense Series", genres: ["Mystery", "Thriller"] },
+    { id: "series-science-fiction", title: "Science Fiction Series", genres: ["Science fiction"] },
+    { id: "series-adventure-drama", title: "Adventure & Drama Series", genres: ["Adventure", "Drama"] },
+  ],
+  Film: [
+    { id: "films-adventure", title: "Adventure Films", genres: ["Adventure"] },
+    { id: "films-drama", title: "Drama Films", genres: ["Drama"] },
+  ],
+};
+
+const matchScore = (item) => Number.parseInt(item.match, 10) || 0;
+const byMatch = (a, b) => matchScore(b) - matchScore(a);
+const byReleaseThenMatch = (a, b) => Number(b.year) - Number(a.year) || byMatch(a, b);
+
+export function buildTypeRows(items, type) {
+  return (TYPE_GENRE_SECTIONS[type] || [])
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      items: items.filter(
+        (item) => item.type === type && section.genres.some((genre) => item.genres.includes(genre)),
+      ),
+    }))
+    .filter((row) => row.items.length > 1);
+}
+
+export function buildPopularRows(items) {
+  const trending = items.filter(
+    (item) => item.year === "2026" || matchScore(item) >= 97,
+  );
+  const newReleases = items.filter((item) => Number(item.year) >= 2025);
+
+  return [
+    { id: "trending-now", title: "Trending Now", items: [...trending].sort(byMatch) },
+    { id: "new-releases", title: "New Releases", items: [...newReleases].sort(byReleaseThenMatch) },
+    {
+      id: "popular-series",
+      title: "Popular TV Shows",
+      items: items.filter((item) => item.type === "Series").sort(byMatch),
+    },
+    {
+      id: "popular-films",
+      title: "Popular Movies",
+      items: items.filter((item) => item.type === "Film").sort(byMatch),
+    },
+  ].filter((row) => row.items.length > 0);
+}
+
 export function buildHomeRows(items, profileName) {
   return [
     {

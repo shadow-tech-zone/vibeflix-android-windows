@@ -14,7 +14,13 @@ import Navigation from "./components/Navigation.jsx";
 import PlaybackOverlay from "./components/PlaybackOverlay.jsx";
 import SpotlightHero from "./components/SpotlightHero.jsx";
 import TitleDetailsModal from "./components/TitleDetailsModal.jsx";
-import { buildHomeRows, CATALOG, FEATURED_TITLE_ID } from "./data/catalog.js";
+import {
+  buildHomeRows,
+  buildPopularRows,
+  buildTypeRows,
+  CATALOG,
+  FEATURED_TITLE_ID,
+} from "./data/catalog.js";
 import { useMyList } from "./hooks/useMyList.js";
 import { COLORS, PAGE_GUTTER } from "./theme.js";
 
@@ -84,8 +90,8 @@ export default function App() {
 
   const visibleItems = useMemo(() => {
     let items = profileCatalog;
-    if (activeTab === "Series") items = items.filter((item) => item.type === "Series");
-    if (activeTab === "Films") items = items.filter((item) => item.type === "Film");
+    if (activeTab === "TV Shows") items = items.filter((item) => item.type === "Series");
+    if (activeTab === "Movies") items = items.filter((item) => item.type === "Film");
     if (activeTab === "My List") items = items.filter((item) => savedSet.has(item.id));
 
     const term = query.trim().toLowerCase();
@@ -110,6 +116,9 @@ export default function App() {
     if (activeTab === "My List") {
       return [{ id: "my-list", title: "My List", items: visibleItems }];
     }
+    if (activeTab === "TV Shows") return buildTypeRows(profileCatalog, "Series");
+    if (activeTab === "Movies") return buildTypeRows(profileCatalog, "Film");
+    if (activeTab === "New & Popular") return buildPopularRows(profileCatalog);
     if (activeTab !== "Home") {
       return [{ id: activeTab.toLowerCase(), title: activeTab, items: visibleItems }];
     }

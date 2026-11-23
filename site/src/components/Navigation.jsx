@@ -9,7 +9,7 @@ import {
 import Brand from "./Brand.jsx";
 import { COLORS } from "../theme.js";
 
-const TABS = ["Home", "Series", "Films", "My List"];
+const TABS = ["Home", "TV Shows", "Movies", "New & Popular", "My List"];
 const PROFILES = ["Sam", "Kids"];
 
 export default function Navigation({
