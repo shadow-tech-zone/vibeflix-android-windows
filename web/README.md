@@ -1,6 +1,6 @@
 # VibeFlix web client
 
-React + TypeScript + Vite client for the VibeFlix GitHub Pages web app. The client calls the deployed `vibeflix-provider` Supabase Edge Function for live catalog, details, episodes, and on-demand stream resolution.
+React + TypeScript + Vite client for the VibeFlix GitHub Pages web app. It opens with an original welcome/FAQ page, then leads into the provider-backed browse experience with search, title details, series episodes, My List, history, resume progress, and playback controls. Catalog, details, episodes, and on-demand stream resolution use the existing `vibeflix-provider` Supabase Edge Function; the frontend does not use Firebase or TMDB credentials and does not require sign-in.
 
 ## Local development
 

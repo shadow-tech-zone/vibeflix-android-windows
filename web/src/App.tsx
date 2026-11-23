@@ -24,6 +24,7 @@ import {
   toggleSaved,
   writeLibrary,
 } from './library'
+import WelcomeScreen from './WelcomeScreen'
 import type {
   CatalogTitle,
   LibraryProgress,
@@ -333,6 +334,7 @@ function DetailsDialog({
 
 function App() {
   const [library, setLibrary] = useState<LibraryState>(readLibrary)
+  const [showWelcome, setShowWelcome] = useState(() => window.location.hash !== '#browse')
   const [source, setSource] = useState<SourceChoice>('Both Servers')
   const [filter, setFilter] = useState<BrowseFilter>('All')
   const [page, setPage] = useState<PageName>('Home')
@@ -779,6 +781,26 @@ function App() {
     window.requestAnimationFrame(() => returnFocusRef.current?.focus())
   }, [])
 
+  const enterCatalog = () => {
+    goTo('Home')
+    if (window.location.hash === '#browse') setShowWelcome(false)
+    else window.location.hash = 'browse'
+  }
+
+  useEffect(() => {
+    const syncViewFromHash = () => {
+      const browseRequested = window.location.hash === '#browse'
+      setShowWelcome(!browseRequested)
+      if (!browseRequested) {
+        if (player) closePlayer()
+        if (activeTitle) closeDetails()
+        returnFocusRef.current = null
+      }
+    }
+    window.addEventListener('hashchange', syncViewFromHash)
+    return () => window.removeEventListener('hashchange', syncViewFromHash)
+  }, [activeTitle, closeDetails, closePlayer, player])
+
   const header = (
     <header className="site-header">
       <a href="#home" className="brand" onClick={(event) => { event.preventDefault(); goTo('Home') }} aria-label="VibeFlix home">
@@ -857,9 +879,13 @@ function App() {
   )
 
   return (
-    <div className="app-shell" id="home">
-      {header}
-      <main>
+    <div className={`app-shell${showWelcome ? ' app-shell--welcome' : ''}`} id={showWelcome ? 'app-root' : 'home'}>
+      {showWelcome ? (
+        <WelcomeScreen featured={featured} heroBackdrop={heroBackdrop} onBrowse={enterCatalog} />
+      ) : (
+        <>
+          {header}
+          <main>
         {page === 'Home' && featured && (
           <section className="hero" aria-label={`Featured title ${featured.name}`}>
             {heroBackdrop && <img className="hero__art" src={heroBackdrop} alt="" />}
@@ -1032,6 +1058,8 @@ function App() {
             </div>
           </section>
         </div>
+      )}
+        </>
       )}
     </div>
   )
