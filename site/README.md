@@ -11,7 +11,9 @@ A personal, responsive React Native Web prototype that reimplements a familiar d
 - `src/hooks/useMyList.js` owns the browser-persisted watchlist state.
 - A root render error boundary shows a recovery view instead of leaving an empty page.
 
-The app is intentionally self-contained: original local SVG illustrations, no remote fonts or image services, no account backend, no provider API, and no actual stream source. My List is stored only in the current browser. The Play action opens an honest preview shell until a licensed playback source is configured.
+The app is intentionally self-contained: original local SVG illustrations, no remote fonts or image services, no account backend, no playback-provider API, and no actual stream source. My List is stored only in the current browser. The Play action opens an honest preview shell until a licensed playback source is configured.
+
+A separate read-only API Anything adapter exposes only Play4u's public catalog metadata at `GET /api/play4u`; it is not connected to VibeFlix playback or the fictional app catalog. Use `/play4u-test.html` on the protected Vercel deployment to test browsing/search and movie/series metadata. The draft and live-verification caveats are documented in `../api-anything/play4u/README.md`. Offline adapter tests run with `npm test`.
 
 The Vercel project must remain protected by SSO for personal use. Do not make it public or disable that protection.
 

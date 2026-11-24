@@ -1,0 +1,279 @@
+{
+  "name": "play4u",
+  "displayName": "Play4u (public catalog metadata)",
+  "baseUrl": "https://play4u.org",
+  "description": "Read-only access to Play4u's publicly visible movie and series catalog metadata. This draft does not expose player or video-stream sources.",
+  "pace": {
+    "minIntervalMs": 1500,
+    "perHour": 120
+  },
+  "operations": [
+    {
+      "name": "browseTitles",
+      "description": "Browse public movie and series catalog cards, with optional search, category, industry, language, genre and page filters. Returns card metadata only; no player or stream URLs.",
+      "request": {
+        "method": "GET",
+        "url": "https://play4u.org/?q=%7Bquery%7D&cat=%7Bcategory%7D&industry=%7Bindustry%7D&lang=%7Blanguage%7D&genre=%7Bgenre%7D&page=%7Bpage%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml"
+        }
+      },
+      "slots": [
+        {
+          "param": "query",
+          "at": [
+            "query:q"
+          ]
+        },
+        {
+          "param": "category",
+          "at": [
+            "query:cat"
+          ]
+        },
+        {
+          "param": "industry",
+          "at": [
+            "query:industry"
+          ]
+        },
+        {
+          "param": "language",
+          "at": [
+            "query:lang"
+          ]
+        },
+        {
+          "param": "genre",
+          "at": [
+            "query:genre"
+          ]
+        },
+        {
+          "param": "page",
+          "at": [
+            "query:page"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://play4u.org/?q={query}&cat={category}&industry={industry}&lang={language}&genre={genre}&page={page}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "play4u.org",
+        "path": "/"
+      },
+      "response": {
+        "format": "html",
+        "contentType": "text/html; charset=utf-8",
+        "html": {
+          "items": "a[href*='/watch/tt'], a[href*='/series/tt']",
+          "fields": {
+            "detailUrl": "@href",
+            "title": "img@alt",
+            "poster": "img@src",
+            "lazyPoster": "img@data-src",
+            "cardText": ""
+          }
+        },
+        "pick": [
+          "id=detailUrl~(?:watch|series)\\/(tt[0-9]+)",
+          "route=detailUrl~/(watch|series)/",
+          "title",
+          "poster",
+          "lazyPoster",
+          "detailUrl",
+          "year=cardText~\\b((?:19|20)\\d{2})\\b",
+          "rating=cardText~^((?:TV-[A-Z0-9]+|NC\\s?16|UA\\s?\\d{1,2}\\+?|PG-13|PG|NR|R|G))(?=\\s|S\\d|E\\d|[A-Z]{2}|$)",
+          "cardText"
+        ],
+        "key": "id"
+      },
+      "params": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional catalog search text.",
+          "example": "Breaking Bad",
+          "default": ""
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "required": false,
+          "description": "Catalog category. The public navigation shows 'latest'; leave empty for the default catalog.",
+          "example": "latest",
+          "default": "",
+          "enum": [
+            "",
+            "latest"
+          ]
+        },
+        {
+          "name": "industry",
+          "type": "string",
+          "required": false,
+          "description": "Industry filter from the public navigation.",
+          "example": "hollywood",
+          "default": "",
+          "enum": [
+            "",
+            "hollywood",
+            "bollywood",
+            "kollywood"
+          ]
+        },
+        {
+          "name": "language",
+          "type": "string",
+          "required": false,
+          "description": "Language filter from the public navigation.",
+          "example": "en",
+          "default": "",
+          "enum": [
+            "",
+            "en",
+            "hi",
+            "ta",
+            "te"
+          ]
+        },
+        {
+          "name": "genre",
+          "type": "string",
+          "required": false,
+          "description": "Genre filter from the public navigation.",
+          "example": "drama",
+          "default": "",
+          "enum": [
+            "",
+            "drama",
+            "action",
+            "thriller",
+            "crime"
+          ]
+        },
+        {
+          "name": "page",
+          "type": "number",
+          "required": false,
+          "description": "One-based catalog page. Pagination parameter needs live verification.",
+          "example": 1,
+          "default": 1,
+          "min": 1,
+          "max": 100
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "publicOnly": true,
+      "unproven": {
+        "params": [
+          "query",
+          "category",
+          "industry",
+          "language",
+          "genre",
+          "page"
+        ],
+        "reason": "Draft inferred from the public homepage. Search and filter query behavior, pagination, and HTML card selectors have not been captured and verified live."
+      }
+    },
+    {
+      "name": "getTitle",
+      "description": "Read public metadata from a movie or series title page. Use route=watch for a movie and route=series for a series. Does not inspect or return player, embed, or video-stream data.",
+      "request": {
+        "method": "GET",
+        "url": "https://play4u.org/%7Broute%7D/%7Bid%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml"
+        }
+      },
+      "slots": [
+        {
+          "param": "route",
+          "at": [
+            "path:0"
+          ]
+        },
+        {
+          "param": "id",
+          "at": [
+            "path:1"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://play4u.org/{route}/{id}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "play4u.org",
+        "path": "/*/*"
+      },
+      "response": {
+        "format": "html",
+        "contentType": "text/html; charset=utf-8",
+        "html": {
+          "items": "html",
+          "fields": {
+            "title": "meta[property='og:title']@content",
+            "pageTitle": "title",
+            "description": "meta[property='og:description']@content",
+            "metaDescription": "meta[name='description']@content",
+            "poster": "meta[property='og:image']@content",
+            "canonicalUrl": "link[rel='canonical']@href",
+            "contentType": "meta[property='og:type']@content"
+          }
+        },
+        "pick": [
+          "title",
+          "pageTitle",
+          "description",
+          "metaDescription",
+          "poster",
+          "canonicalUrl",
+          "contentType"
+        ]
+      },
+      "params": [
+        {
+          "name": "route",
+          "type": "string",
+          "required": true,
+          "description": "Title route: use watch for a movie or series for a TV series.",
+          "example": "watch",
+          "enum": [
+            "watch",
+            "series"
+          ]
+        },
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "IMDb-style title ID from a public Play4u title link.",
+          "example": "tt36778423",
+          "pattern": "tt[0-9]+",
+          "hint": "a title ID such as tt36778423"
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "publicOnly": true,
+      "unproven": {
+        "params": [
+          "route",
+          "id"
+        ],
+        "reason": "The public movie and series routes and metadata selectors are inferred from public links and common page metadata; not live-captured or verified."
+      }
+    }
+  ]
+}
