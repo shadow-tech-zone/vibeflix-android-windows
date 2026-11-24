@@ -162,6 +162,7 @@ export default function WelcomePage({ compact, onBrowse, onSignIn, onGetStarted 
           </Text>
           <View style={styles.heroActions}>
             <EntryButton onPress={onBrowse}>Explore the catalog</EntryButton>
+            <EntryButton onPress={() => window.location.assign("/play4u.html")} tone="quiet">Browse Play4u titles</EntryButton>
             <EntryButton onPress={onGetStarted} tone="quiet">Get Started</EntryButton>
           </View>
           <Text style={styles.heroDisclaimer}>NO ACCOUNT · NO STREAMING PROVIDER · JUST THE FRONT-END DEMO</Text>

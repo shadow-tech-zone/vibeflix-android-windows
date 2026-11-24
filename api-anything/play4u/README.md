@@ -6,7 +6,7 @@ The canonical two-operation API Anything spec is `site/src/api/play4u.json`. Vib
 
 ## Test directly on Vercel
 
-After deploying the `site` project, open `/play4u-test.html` on that Vercel deployment. The page calls its same-origin serverless function and displays the JSON response. Its requests contact Play4u's public pages; they are not mock responses.
+After deploying the `site` project, open `/play4u.html` on that Vercel deployment. It is a browseable catalog UI with search, filters, page navigation, posters, and title-detail panels; its same-origin serverless function makes live requests to Play4u's public pages. `/play4u-test.html` redirects to the catalog page. The VibeFlix landing page also has a “Browse Play4u titles” button.
 
 The JSON endpoint is `GET /api/play4u`:
 
@@ -55,4 +55,4 @@ API_ANYTHING_LOCAL_ONLY=1 npx -y api-anything@0.5.0 mcp
 
 ## Verification status
 
-The spec has two operations (`browseTitles`, `getTitle`), and both are read-only, public-only, and marked `unproven`. Offline tests validate the spec, endpoint input handling, route mapping, and extraction from fixture HTML; they do **not** prove the live site's search key, filter semantics, pagination, selectors, or title-page metadata. Use the deployed Vercel test page for those live checks. The spec is not published to API Anything's shared registry.
+The user reported that the Vercel smoke test passed. The spec still marks both operations `unproven` because the exact live query/filter cases and returned fields were not recorded. Offline tests validate the spec, endpoint input handling, route mapping, and extraction from fixture HTML; they do not verify every live parameter or selector. Use the deployed catalog UI for browsing and title-detail checks. The spec is not published to API Anything's shared registry.
