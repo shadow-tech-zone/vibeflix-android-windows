@@ -83,9 +83,12 @@ function toPlay4uItem(item) {
   const title = typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Untitled";
   const year = typeof item.year === "string" || typeof item.year === "number" ? String(item.year) : "";
   const rating = typeof item.rating === "string" && item.rating.trim() && item.rating !== "Unrated" ? item.rating.trim() : "";
-  const synopsis = typeof item.cardText === "string" && item.cardText.trim()
-    ? item.cardText.trim()
-    : "No description is available for this title.";
+  const cardText = typeof item.cardText === "string" ? item.cardText.trim() : "";
+  const synopsis = cardText
+    .replace(/\b(?:TV-[A-Z0-9]+|NC\s?16|UA\s?\d{1,2}\+?|PG-13|PG|NR|R|G)\b/gi, " ")
+    .replace(/\b(?:19|20)\d{2}\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return {
     id: item.id,
     kind,
@@ -238,7 +241,7 @@ export default function App() {
     && play4uItems.length > 0;
   const isHome = isLocalHome || isPlay4uHome;
   const featuredItem = isPlay4uHome
-    ? play4uItems.find((item) => item.kind === "movie") || play4uItems[0]
+    ? play4uItems[0]
     : profileCatalog.find((item) => item.id === FEATURED_TITLE_ID) || profileCatalog[0];
 
   const rows = useMemo(() => {
@@ -255,12 +258,12 @@ export default function App() {
       if (activeTab === "TV Shows") return [{ id: "catalog-series", title: "TV Shows", items }];
       if (activeTab === "New & Popular") return [{ id: "catalog-new-popular", title: "New & Popular", items }];
 
-      const results = [{ id: "catalog-popular", title: "Popular on VibeFlix", items: play4uItems }];
+      const results = [{ id: "catalog-all", title: "Explore All Titles", items: play4uItems }];
       if (play4uItems.length) {
         const movies = play4uItems.filter((item) => item.kind === "movie");
         const series = play4uItems.filter((item) => item.kind === "series");
-        if (movies.length) results.push({ id: "catalog-movies", title: "Popular Movies", items: movies });
-        if (series.length) results.push({ id: "catalog-series", title: "Popular TV Shows", items: series });
+        if (movies.length) results.push({ id: "catalog-movies", title: "Explore Movies", items: movies });
+        if (series.length) results.push({ id: "catalog-series", title: "Explore TV Shows", items: series });
       }
       return results;
     }

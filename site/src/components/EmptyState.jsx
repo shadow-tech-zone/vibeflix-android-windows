@@ -5,7 +5,7 @@ import { COLORS } from "../theme.js";
 export default function EmptyState({ onBrowse }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Your list is empty.</Text>
+      <Text accessibilityRole="header" style={styles.title}>Your list is empty.</Text>
       <Text style={styles.description}>
         Add titles to My List and they’ll be waiting here when you’re ready.
       </Text>

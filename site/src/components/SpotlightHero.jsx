@@ -1,19 +1,36 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import ActionButton from "./ActionButton.jsx";
 import Navigation from "./Navigation.jsx";
 import { COLORS } from "../theme.js";
 
 export default function SpotlightHero({ item, compact, navigationProps, onPlay, onMoreInfo }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [item.id, item.art]);
+
   return (
     <View style={[styles.hero, compact && styles.heroCompact]}>
-      {item.art ? (
+      {item.art && !imageFailed ? (
         <Image
           accessibilityLabel={item.isPublicCatalog ? `Poster for ${item.title}` : `Illustrated backdrop for ${item.title}`}
-          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+          resizeMode={item.isPublicCatalog ? "contain" : "cover"}
           source={{ uri: item.art }}
-          style={styles.artwork}
+          style={[
+            item.isPublicCatalog ? styles.catalogArtwork : styles.artwork,
+            compact && item.isPublicCatalog && styles.catalogArtworkCompact,
+          ]}
         />
+      ) : item.isPublicCatalog ? (
+        <View
+          pointerEvents="none"
+          style={[styles.catalogArtworkFallback, compact && styles.catalogArtworkFallbackCompact]}
+        >
+          <Text numberOfLines={3} style={styles.catalogArtworkFallbackText}>{item.title}</Text>
+        </View>
       ) : (
         <View pointerEvents="none" style={styles.artworkFallback} />
       )}
@@ -22,17 +39,25 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
       <View pointerEvents="none" style={styles.bottomShade} />
       <Navigation {...navigationProps} compact={compact} />
 
-      <View style={[styles.content, compact && styles.contentCompact]}>
+      <View
+        style={[
+          styles.content,
+          compact && styles.contentCompact,
+          compact && item.isPublicCatalog && styles.contentCatalogCompact,
+        ]}
+      >
         <Text style={styles.kicker}>{item.isPublicCatalog ? "VIBEFLIX SPOTLIGHT" : `VIBEFLIX ${item.type.toUpperCase()}`}</Text>
         <Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}>
           {item.title}
         </Text>
         <View style={styles.metadata}>
           {item.isPublicCatalog ? (
-            <>
-              {item.year ? <Text style={styles.metaText}>{item.year}</Text> : null}
-              {item.maturity ? <Text style={styles.metaText}>{item.maturity}</Text> : null}
-            </>
+            [item.type, item.year, item.maturity].filter(Boolean).map((value, index) => (
+              <React.Fragment key={`${value}-${index}`}>
+                {index > 0 ? <Text style={styles.dot}>•</Text> : null}
+                <Text style={styles.metaText}>{value}</Text>
+              </React.Fragment>
+            ))
           ) : (
             <>
               <Text style={styles.match}>{item.match}</Text>
@@ -44,9 +69,11 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
             </>
           )}
         </View>
-        <Text style={[styles.synopsis, compact && styles.synopsisCompact]} numberOfLines={4}>
-          {item.synopsis}
-        </Text>
+        {item.synopsis ? (
+          <Text style={[styles.synopsis, compact && styles.synopsisCompact]} numberOfLines={4}>
+            {item.synopsis}
+          </Text>
+        ) : null}
         <View style={styles.actions}>
           {item.isPublicCatalog ? (
             <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
@@ -63,7 +90,7 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
         </View>
       </View>
 
-      {item.maturity ? (
+      {item.maturity && !item.isPublicCatalog ? (
         <View style={styles.maturityBadge}>
           <Text style={styles.maturityText}>{item.maturity}</Text>
         </View>
@@ -84,11 +111,17 @@ const styles = StyleSheet.create({
   heroCompact: { height: 570, minHeight: 530 },
   artwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
   artworkFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#292929" },
+  catalogArtwork: { position: "absolute", top: "11%", right: "7%", width: "36%", height: "76%", borderRadius: 6, backgroundColor: "#252525" },
+  catalogArtworkCompact: { top: "8%", right: "5%", width: "32%", height: "34%", borderRadius: 5 },
+  catalogArtworkFallback: { position: "absolute", top: "11%", right: "7%", width: "36%", height: "76%", alignItems: "center", justifyContent: "center", padding: 18, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, backgroundColor: "#252525" },
+  catalogArtworkFallbackCompact: { top: "8%", right: "5%", width: "32%", height: "34%", padding: 9 },
+  catalogArtworkFallbackText: { color: "#999", fontFamily: "Arial", fontSize: 12, fontWeight: "700", textAlign: "center" },
   backdropShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.08)" },
   leftShade: { position: "absolute", top: 0, left: 0, bottom: 0, width: "68%", backgroundColor: "rgba(0,0,0,0.35)" },
   bottomShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 240, backgroundColor: "rgba(20,20,20,0.54)" },
   content: { position: "absolute", zIndex: 2, left: "4.3%", bottom: 105, width: 550, maxWidth: "55%" },
   contentCompact: { left: 20, right: 18, bottom: 62, width: "auto", maxWidth: 470 },
+  contentCatalogCompact: { right: "auto", bottom: 46, width: "55%", maxWidth: 470 },
   kicker: { marginBottom: 9, color: "#f5f5f1", fontFamily: "Arial", fontSize: 10, fontWeight: "700", letterSpacing: 1.7, textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
   title: { color: COLORS.white, fontFamily: "Arial", fontSize: 58, fontWeight: "900", lineHeight: 64, letterSpacing: -1.7, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 8 },
   titleCompact: { maxWidth: 400, fontSize: 40, lineHeight: 44, letterSpacing: -0.9 },

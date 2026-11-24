@@ -12,6 +12,10 @@ const FILTERS = [
 export default function Play4uFilterBar({ filters, onChange, onApply, onClear, loading, compact }) {
   const [expanded, setExpanded] = useState(false);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const activeFilterSummary = FILTERS.map((filter) => {
+    const value = filters[filter.key] ?? "";
+    return filter.options.find(([optionValue]) => optionValue && optionValue === value)?.[1];
+  }).filter(Boolean).join(" · ");
 
   return (
     <View style={[styles.container, compact && styles.containerCompact]}>
@@ -20,12 +24,17 @@ export default function Play4uFilterBar({ filters, onChange, onApply, onClear, l
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         onPress={() => setExpanded((current) => !current)}
-        style={[styles.toggle, expanded && styles.toggleExpanded]}
+        style={({ hovered, pressed }) => [
+          styles.toggle,
+          expanded && styles.toggleExpanded,
+          hovered && styles.toggleHovered,
+          pressed && styles.togglePressed,
+        ]}
       >
         <Text style={styles.toggleTitle}>Filters</Text>
         {activeFilterCount > 0 && (
-          <Text style={styles.activeCount}>
-            {activeFilterCount} active {activeFilterCount === 1 ? "filter" : "filters"}
+          <Text numberOfLines={1} style={[styles.activeCount, compact && styles.activeCountCompact]}>
+            {activeFilterCount} active · {activeFilterSummary}
           </Text>
         )}
         <Text style={styles.chevron}>{expanded ? "⌃" : "⌄"}</Text>
@@ -44,6 +53,7 @@ export default function Play4uFilterBar({ filters, onChange, onApply, onClear, l
                     return (
                       <Pressable
                         key={`${filter.key}-${value || "all"}`}
+                        accessibilityLabel={`${filter.label}: ${label}`}
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                         onPress={() => onChange(filter.key, value)}
@@ -86,8 +96,11 @@ const styles = StyleSheet.create({
   containerCompact: { marginHorizontal: 20, marginBottom: 7 },
   toggle: { minHeight: 35, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 11, borderWidth: 1, borderColor: "#464646", borderRadius: 4, backgroundColor: "rgba(20,20,20,0.92)" },
   toggleExpanded: { borderBottomColor: "#333" },
+  toggleHovered: { borderColor: "#777", backgroundColor: "#222" },
+  togglePressed: { opacity: 0.78 },
   toggleTitle: { color: COLORS.white, fontFamily: "Arial", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  activeCount: { marginLeft: 2, color: "#aaa", fontFamily: "Arial", fontSize: 9 },
+  activeCount: { maxWidth: 290, marginLeft: 2, color: "#aaa", fontFamily: "Arial", fontSize: 9 },
+  activeCountCompact: { maxWidth: 145 },
   chevron: { marginLeft: 2, color: "#ccc", fontFamily: "Arial", fontSize: 14, lineHeight: 18 },
   panel: { marginTop: 8, padding: 14, borderWidth: 1, borderColor: "#303030", borderRadius: 4, backgroundColor: "rgba(24,24,24,0.97)" },
   panelCompact: { padding: 11 },

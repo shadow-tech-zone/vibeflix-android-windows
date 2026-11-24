@@ -11,10 +11,13 @@ import { COLORS, PAGE_GUTTER } from "../theme.js";
 
 function MediaCard({ item, compact, onSelect }) {
   const [hovered, setHovered] = useState(false);
-  const badge = item.isPublicCatalog ? item.maturity : item.match;
+  const [imageFailed, setImageFailed] = useState(false);
+  const catalogPoster = Boolean(item.isPublicCatalog);
+  const badge = catalogPoster ? item.maturity : item.match;
   return (
     <Pressable
       accessibilityLabel={`${item.title}, ${item.type}`}
+      accessibilityHint={catalogPoster ? "Open title information" : "Open title details"}
       accessibilityRole="button"
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
@@ -22,14 +25,22 @@ function MediaCard({ item, compact, onSelect }) {
       style={({ hovered: platformHovered, pressed }) => [
         styles.card,
         compact && styles.cardCompact,
+        catalogPoster && styles.catalogCard,
+        catalogPoster && compact && styles.catalogCardCompact,
         (hovered || platformHovered) && styles.cardHover,
         pressed && styles.cardPressed,
       ]}
     >
-      <View style={[styles.imageWrap, compact && styles.imageWrapCompact]}>
-        {item.cardArt ? (
+      <View style={[
+        styles.imageWrap,
+        compact && styles.imageWrapCompact,
+        catalogPoster && styles.catalogImageWrap,
+        catalogPoster && compact && styles.catalogImageWrapCompact,
+      ]}>
+        {item.cardArt && !imageFailed ? (
           <Image
             accessibilityLabel={`Poster for ${item.title}`}
+            onError={() => setImageFailed(true)}
             resizeMode="cover"
             source={{ uri: item.cardArt }}
             style={styles.image}
@@ -74,6 +85,7 @@ export default function MediaRail({ title, items, compact, onSelect }) {
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusedArrow, setHasFocusedArrow] = useState(false);
   const controlsVisible = isHovered || hasFocusedArrow;
+  const catalogRail = items.some((item) => item.isPublicCatalog);
   if (!items.length) return null;
 
   const scrollRail = (direction) => {
@@ -105,7 +117,12 @@ export default function MediaRail({ title, items, compact, onSelect }) {
         testID="media-rail-container"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        style={[styles.railContainer, compact && styles.railContainerCompact]}
+        style={[
+          styles.railContainer,
+          compact && styles.railContainerCompact,
+          catalogRail && styles.catalogRailContainer,
+          catalogRail && compact && styles.catalogRailContainerCompact,
+        ]}
       >
         <ScrollView
           ref={railRef}
@@ -171,6 +188,8 @@ const styles = StyleSheet.create({
   exploreArrow: { color: "#b3b3b3", fontFamily: "Arial", fontSize: 17, lineHeight: 20 },
   railContainer: { position: "relative", minHeight: 180 },
   railContainerCompact: { minHeight: 149 },
+  catalogRailContainer: { minHeight: 286 },
+  catalogRailContainerCompact: { minHeight: 245 },
   railControls: { position: "absolute", zIndex: 6, top: 0, right: 0, bottom: 0, left: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 2, opacity: 0 },
   railControlsVisible: { opacity: 1 },
   railControlsCompact: { display: "none" },
@@ -182,10 +201,14 @@ const styles = StyleSheet.create({
   railContentCompact: { gap: 8, paddingHorizontal: 20 },
   card: { width: 232, overflow: "hidden", borderRadius: 4, backgroundColor: COLORS.surface, transform: [{ scale: 1 }], zIndex: 1 },
   cardCompact: { width: 180 },
+  catalogCard: { width: 156 },
+  catalogCardCompact: { width: 128 },
   cardHover: { transform: [{ scale: 1.045 }], zIndex: 5 },
   cardPressed: { transform: [{ scale: 0.985 }] },
   imageWrap: { position: "relative", width: "100%", height: 132, overflow: "hidden", backgroundColor: "#292929" },
   imageWrapCompact: { height: 103 },
+  catalogImageWrap: { height: 234 },
+  catalogImageWrapCompact: { height: 192 },
   image: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
   posterFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "#242424" },
   posterFallbackText: { color: "#8c8c8c", fontFamily: "Arial", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
