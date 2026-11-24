@@ -18,7 +18,7 @@ export default function Footer({ onOpenWelcome, catalogMode = false }) {
       </View>
       <Text style={styles.disclaimer}>
         {catalogMode
-          ? "Play4u cards show public catalog metadata only. VibeFlix does not provide playback, embeds, or stream-source links."
+          ? "Title cards and details show metadata only. VibeFlix does not host or play video or provide stream-source links."
           : "VibeFlix is an independent UI experiment and is not affiliated with Netflix or any content provider. Titles and artwork are fictional and original. No accounts, licensed streams, or provider APIs are connected."}
       </Text>
       <View style={[styles.bottomLine, styles.bottomLineResponsive]}>

@@ -11,19 +11,6 @@ import {
 import ActionButton from "./ActionButton.jsx";
 import { COLORS } from "../theme.js";
 
-function openPublicTitle(item) {
-  const value = item.canonicalUrl || item.detailUrl;
-  if (typeof window === "undefined" || !value) return;
-  try {
-    const url = new URL(value);
-    if (url.protocol === "https:" && ["play4u.org", "www.play4u.org"].includes(url.hostname)) {
-      window.open(url.href, "_blank", "noopener,noreferrer");
-    }
-  } catch {
-    // Ignore malformed or non-public title URLs.
-  }
-}
-
 export default function TitleDetailsModal({ item, saved, onClose, onPlay, onToggleSaved }) {
   return (
     <Modal animationType="fade" onRequestClose={onClose} transparent visible={Boolean(item)}>
@@ -34,13 +21,13 @@ export default function TitleDetailsModal({ item, saved, onClose, onPlay, onTogg
             <View style={styles.artWrap}>
               {item.art ? (
                 <Image
-                  accessibilityLabel={item.isPublicCatalog ? `Public poster for ${item.title}` : `Original illustration for ${item.title}`}
+                  accessibilityLabel={item.isPublicCatalog ? `Poster for ${item.title}` : `Original illustration for ${item.title}`}
                   resizeMode="cover"
                   source={{ uri: item.art }}
                   style={styles.art}
                 />
               ) : (
-                <Text style={styles.artFallback}>{item.isPublicCatalog ? "PLAY4U" : item.title}</Text>
+                <Text numberOfLines={3} style={styles.artFallback}>{item.title}</Text>
               )}
               <View pointerEvents="none" style={styles.artFade} />
               <Pressable accessibilityLabel="Close details" accessibilityRole="button" onPress={onClose} style={styles.closeButton}>
@@ -50,32 +37,24 @@ export default function TitleDetailsModal({ item, saved, onClose, onPlay, onTogg
             <ScrollView contentContainerStyle={styles.content}>
               <Text accessibilityRole="header" style={styles.title}>{item.title}</Text>
               <View style={styles.metadata}>
-                <Text style={styles.match}>{item.match}</Text>
-                <Text style={styles.metaText}>{item.year}</Text>
-                <Text style={styles.metaText}>{item.maturity}</Text>
-                <Text style={styles.metaText}>{item.length}</Text>
+                {item.match ? <Text style={styles.match}>{item.match}</Text> : null}
+                {item.year ? <Text style={styles.metaText}>{item.year}</Text> : null}
+                {item.maturity ? <Text style={styles.metaText}>{item.maturity}</Text> : null}
+                {item.length ? <Text style={styles.metaText}>{item.length}</Text> : null}
               </View>
               <Text style={styles.synopsis}>{item.synopsis}</Text>
               {item.isPublicCatalog && (item.detailLoading || item.detailError) && (
                 <Text accessibilityRole="status" style={[styles.detailStatus, item.detailError && styles.detailError]}>
-                  {item.detailLoading ? "Loading public title details…" : item.detailError}
+                  {item.detailLoading ? "Loading title details…" : item.detailError}
                 </Text>
               )}
               <View style={styles.infoBlock}>
-                <Text style={styles.infoLine}><Text style={styles.infoLabel}>Genres: </Text>{item.genres.join(", ")}</Text>
+                {item.genres.length > 0 ? (
+                  <Text style={styles.infoLine}><Text style={styles.infoLabel}>Genres: </Text>{item.genres.join(", ")}</Text>
+                ) : null}
                 <Text style={styles.infoLine}><Text style={styles.infoLabel}>Format: </Text>{item.type}</Text>
               </View>
-              {item.isPublicCatalog ? (
-                <View style={styles.actions}>
-                  {(item.canonicalUrl || item.detailUrl) ? (
-                    <Pressable accessibilityRole="link" onPress={() => openPublicTitle(item)} style={styles.publicLinkButton}>
-                      <Text style={styles.publicLinkText}>Open Play4u title page ↗</Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.detailStatus}>No public title-page link is available.</Text>
-                  )}
-                </View>
-              ) : (
+              {!item.isPublicCatalog && (
                 <View style={styles.actions}>
                   <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
                   <Pressable
@@ -91,7 +70,7 @@ export default function TitleDetailsModal({ item, saved, onClose, onPlay, onTogg
               )}
               <Text style={styles.disclaimer}>
                 {item.isPublicCatalog
-                  ? "Public title metadata · No playback or stream sources accessed"
+                  ? "Title information only · No playback or stream sources accessed"
                   : "Fictional demo title · Original VibeFlix artwork · No stream source connected"}
               </Text>
             </ScrollView>
@@ -127,7 +106,5 @@ const styles = StyleSheet.create({
   listText: { color: COLORS.white, fontFamily: "Arial", fontSize: 11, fontWeight: "700" },
   detailStatus: { marginTop: 8, color: "#aaa", fontFamily: "Arial", fontSize: 10, lineHeight: 15 },
   detailError: { color: "#f0a1a5" },
-  publicLinkButton: { minHeight: 43, justifyContent: "center", paddingHorizontal: 15, borderRadius: 4, backgroundColor: COLORS.red },
-  publicLinkText: { color: COLORS.white, fontFamily: "Arial", fontSize: 11, fontWeight: "800" },
   disclaimer: { marginTop: 18, color: "#767676", fontFamily: "Arial", fontSize: 8, lineHeight: 13 },
 });

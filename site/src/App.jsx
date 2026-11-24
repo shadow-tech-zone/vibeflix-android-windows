@@ -76,26 +76,16 @@ function publicImageUrl(value) {
   }
 }
 
-function publicTitleUrl(value) {
-  if (typeof value !== "string" || !value.trim()) return "";
-  try {
-    const url = new URL(value, "https://play4u.org");
-    return url.protocol === "https:" && ["play4u.org", "www.play4u.org"].includes(url.hostname) ? url.href : "";
-  } catch {
-    return "";
-  }
-}
-
 function toPlay4uItem(item) {
   const kind = item.kind === "series" ? "series" : "movie";
   const type = kind === "series" ? "Series" : "Film";
   const poster = publicImageUrl(item.poster || item.lazyPoster);
   const title = typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Untitled";
   const year = typeof item.year === "string" || typeof item.year === "number" ? String(item.year) : "";
-  const rating = typeof item.rating === "string" && item.rating.trim() ? item.rating.trim() : "Unrated";
+  const rating = typeof item.rating === "string" && item.rating.trim() && item.rating !== "Unrated" ? item.rating.trim() : "";
   const synopsis = typeof item.cardText === "string" && item.cardText.trim()
     ? item.cardText.trim()
-    : "Public Play4u title metadata.";
+    : "No description is available for this title.";
   return {
     id: item.id,
     kind,
@@ -105,14 +95,13 @@ function toPlay4uItem(item) {
     maturity: rating,
     age: 18,
     length: "",
-    genres: ["Public catalog"],
+    genres: [],
     art: poster,
     cardArt: poster,
     progress: 0,
     progressLabel: "",
-    match: "PUBLIC",
+    match: "",
     synopsis,
-    detailUrl: publicTitleUrl(item.detailUrl),
     isPublicCatalog: true,
   };
 }
@@ -206,7 +195,7 @@ export default function App() {
       setPlay4uHasMore(items.length >= 30 && page < 100);
     } catch (error) {
       if (requestId !== play4uRequestRef.current) return;
-      setPlay4uError(error instanceof Error ? error.message : "Could not load the public catalog.");
+      setPlay4uError(error instanceof Error ? error.message : "Could not load the catalog.");
     } finally {
       if (requestId === play4uRequestRef.current) {
         setPlay4uLoading(false);
@@ -244,12 +233,12 @@ export default function App() {
 
   const isLocalHome = !play4uMode && activeTab === "Home" && query.trim().length === 0;
   const isPlay4uHome = play4uMode
-    && ["Home", "Play4u"].includes(activeTab)
+    && activeTab === "Home"
     && !play4uSearchText
     && play4uItems.length > 0;
   const isHome = isLocalHome || isPlay4uHome;
   const featuredItem = isPlay4uHome
-    ? play4uItems[0]
+    ? play4uItems.find((item) => item.kind === "movie") || play4uItems[0]
     : profileCatalog.find((item) => item.id === FEATURED_TITLE_ID) || profileCatalog[0];
 
   const rows = useMemo(() => {
@@ -260,18 +249,18 @@ export default function App() {
           ? play4uItems.filter((item) => item.kind === "series")
           : play4uItems;
       if (play4uSearchText) {
-        return [{ id: "play4u-search-results", title: `Search results for “${play4uSearchText}”`, items }];
+        return [{ id: "catalog-search-results", title: `Search results for “${play4uSearchText}”`, items }];
       }
-      if (activeTab === "Movies") return [{ id: "play4u-movies", title: "Movies on Play4u", items }];
-      if (activeTab === "TV Shows") return [{ id: "play4u-series", title: "Series on Play4u", items }];
-      if (activeTab === "New & Popular") return [{ id: "play4u-new-popular", title: "New & Popular on Play4u", items }];
+      if (activeTab === "Movies") return [{ id: "catalog-movies", title: "Movies", items }];
+      if (activeTab === "TV Shows") return [{ id: "catalog-series", title: "TV Shows", items }];
+      if (activeTab === "New & Popular") return [{ id: "catalog-new-popular", title: "New & Popular", items }];
 
-      const results = [{ id: "play4u-results", title: "Popular on Play4u", items: play4uItems }];
+      const results = [{ id: "catalog-popular", title: "Popular on VibeFlix", items: play4uItems }];
       if (play4uItems.length) {
         const movies = play4uItems.filter((item) => item.kind === "movie");
         const series = play4uItems.filter((item) => item.kind === "series");
-        if (movies.length) results.push({ id: "play4u-movies", title: "Movies on Play4u", items: movies });
-        if (series.length) results.push({ id: "play4u-series", title: "Series on Play4u", items: series });
+        if (movies.length) results.push({ id: "catalog-movies", title: "Popular Movies", items: movies });
+        if (series.length) results.push({ id: "catalog-series", title: "Popular TV Shows", items: series });
       }
       return results;
     }
@@ -305,9 +294,8 @@ export default function App() {
 
   const handleTabChange = (tab) => {
     scrollPageToTop();
-    const alreadyOnPlay4uView = tab === activeTab && (play4uMode || tab === "Play4u");
+    const alreadyOnPlay4uView = tab === activeTab && play4uMode;
     const clearRemoteSearch = play4uMode && tab !== activeTab && Boolean(play4uSearchText);
-    if (tab === "Play4u") setPlay4uMode(true);
     setActiveTab(tab);
     setSearchOpen(false);
     setQuery("");
@@ -366,7 +354,7 @@ export default function App() {
     }
 
     const requestId = ++titleRequestRef.current;
-    setSelectedItem({ ...item, detailLoading: true, detailError: "", synopsis: "Loading public title details…" });
+    setSelectedItem({ ...item, detailLoading: true, detailError: "", synopsis: "Loading title details…" });
     const params = new URLSearchParams({ operation: "getTitle", kind: item.kind, id: item.id });
     try {
       const response = await fetch(`/api/play4u?${params.toString()}`, {
@@ -379,14 +367,13 @@ export default function App() {
       if (!response.ok || !result?.ok) throw new Error(result?.reason || result?.error || `Title details failed (${response.status}).`);
       if (requestId !== titleRequestRef.current) return;
       const detail = Array.isArray(result.data) ? result.data[0] : result.data;
-      if (!detail || typeof detail !== "object") throw new Error("No public title details were returned.");
+      if (!detail || typeof detail !== "object") throw new Error("No title details were returned.");
       setSelectedItem((current) => current?.id === item.id ? {
         ...current,
         title: detail.title || detail.pageTitle || current.title,
         art: publicImageUrl(detail.poster) || current.art,
-        synopsis: detail.description || detail.metaDescription || "No public description is available.",
+        synopsis: detail.description || detail.metaDescription || "No description is available.",
         length: detail.contentType || current.length,
-        canonicalUrl: publicTitleUrl(detail.canonicalUrl),
         detailLoading: false,
         detailError: "",
       } : current);
@@ -396,7 +383,7 @@ export default function App() {
         ...current,
         detailLoading: false,
         detailError: error instanceof Error ? error.message : "Could not load title details.",
-        synopsis: "Public title details could not be loaded right now.",
+        synopsis: "Title details could not be loaded right now.",
       } : current);
     }
   };
@@ -408,7 +395,6 @@ export default function App() {
 
   const navigationProps = {
     activeTab,
-    play4uMode,
     scrolled,
     onTabChange: handleTabChange,
     profile,
@@ -423,11 +409,9 @@ export default function App() {
   const pageTitle = play4uMode && activeTab !== "My List"
     ? (play4uSearchText
       ? "Search results"
-      : activeTab === "Play4u"
-        ? "Popular on Play4u"
-        : activeTab === "Home"
-          ? "Browse"
-          : activeTab)
+      : activeTab === "Home"
+        ? "Browse"
+        : activeTab)
     : query.trim()
       ? "Search"
       : activeTab === "My List"
@@ -437,6 +421,15 @@ export default function App() {
           : activeTab;
 
   const enterBrowse = (selectedProfile = profile) => {
+    setPlay4uMode(true);
+    setProfile(selectedProfile);
+    setActiveTab("Home");
+    setSearchOpen(false);
+    setQuery("");
+    setScreen("browse");
+  };
+
+  const enterDemoBrowse = (selectedProfile = profile) => {
     setPlay4uMode(false);
     setProfile(selectedProfile);
     setActiveTab("Home");
@@ -473,7 +466,7 @@ export default function App() {
         compact={compact}
         onBack={() => setScreen("welcome")}
         onSignIn={() => setScreen("sign-in")}
-        onComplete={enterBrowse}
+        onComplete={enterDemoBrowse}
       />
     );
   }
@@ -515,13 +508,13 @@ export default function App() {
           <View style={[styles.railsWrap, styles.play4uRailsWrap]}>
             {play4uLoading || !play4uLoaded ? (
               <CatalogFeedback
-                title="Loading public titles…"
-                message="Fetching Play4u title cards and metadata."
+                title="Loading titles…"
+                message="Loading the latest movie and series picks."
                 compact={compact}
               />
             ) : play4uError ? (
               <CatalogFeedback
-                title="The public catalog is temporarily unavailable"
+                title="We couldn't load the catalog"
                 message={play4uError}
                 actionLabel="Try again"
                 onAction={() => loadPlay4u(play4uPage, play4uSearchText, play4uFilters)}
@@ -539,12 +532,12 @@ export default function App() {
               ))
             ) : (
               <CatalogFeedback
-                title={play4uItems.length ? `No ${play4uCategoryLabel} found on this page` : "No public titles found"}
+                title={play4uItems.length ? `No ${play4uCategoryLabel} found on this page` : "No titles found"}
                 message={hasPlay4uCriteria
                   ? "Try another search or reset one of the filters."
                   : play4uItems.length
                     ? `There are no ${play4uCategoryLabel} to show on this catalog page.`
-                    : "There are no titles to show on this catalog page."}
+                    : "There are no titles to show on this page."}
                 actionLabel={hasPlay4uCriteria ? "Reset search and filters" : undefined}
                 onAction={hasPlay4uCriteria ? handleClearPlay4u : undefined}
                 compact={compact}
@@ -577,10 +570,10 @@ export default function App() {
         </>
       ) : play4uMode && activeTab === "My List" ? (
         <CatalogFeedback
-          title="Play4u titles are browse-only"
-          message="This public catalog does not save Play4u titles to the local VibeFlix demo list."
-          actionLabel="Browse Play4u titles"
-          onAction={() => handleTabChange("Play4u")}
+          title="My List is for demo titles"
+          message="Titles in this browse view aren't saved to the local demo list."
+          actionLabel="Browse titles"
+          onAction={() => handleTabChange("Home")}
           compact={compact}
         />
       ) : activeTab === "My List" && visibleItems.length === 0 && !query.trim() ? (

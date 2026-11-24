@@ -9,7 +9,7 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
     <View style={[styles.hero, compact && styles.heroCompact]}>
       {item.art ? (
         <Image
-          accessibilityLabel={item.isPublicCatalog ? `Public poster for ${item.title}` : `Illustrated backdrop for ${item.title}`}
+          accessibilityLabel={item.isPublicCatalog ? `Poster for ${item.title}` : `Illustrated backdrop for ${item.title}`}
           resizeMode="cover"
           source={{ uri: item.art }}
           style={styles.artwork}
@@ -23,14 +23,13 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
       <Navigation {...navigationProps} compact={compact} />
 
       <View style={[styles.content, compact && styles.contentCompact]}>
-        <Text style={styles.kicker}>{item.isPublicCatalog ? "PLAY4U · PUBLIC TITLE" : `VIBEFLIX ${item.type.toUpperCase()}`}</Text>
+        <Text style={styles.kicker}>{item.isPublicCatalog ? "VIBEFLIX SPOTLIGHT" : `VIBEFLIX ${item.type.toUpperCase()}`}</Text>
         <Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}>
           {item.title}
         </Text>
         <View style={styles.metadata}>
           {item.isPublicCatalog ? (
             <>
-              <Text style={styles.match}>PUBLIC</Text>
               {item.year ? <Text style={styles.metaText}>{item.year}</Text> : null}
               {item.maturity ? <Text style={styles.metaText}>{item.maturity}</Text> : null}
             </>
@@ -64,9 +63,11 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
         </View>
       </View>
 
-      <View style={styles.maturityBadge}>
-        <Text style={styles.maturityText}>{item.maturity}</Text>
-      </View>
+      {item.maturity ? (
+        <View style={styles.maturityBadge}>
+          <Text style={styles.maturityText}>{item.maturity}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -47,7 +47,7 @@ const FAQS = [
   },
   {
     question: "Do I need an account?",
-    answer: "No. Browse Demo opens the catalog directly. The sign-in and setup screens are visual prototypes only; no account service is connected.",
+    answer: "No. Browse opens the catalog directly. The sign-in and setup screens are visual prototypes only; no account service is connected.",
   },
   {
     question: "Where does My List go?",
@@ -144,7 +144,7 @@ export default function WelcomePage({ compact, onBrowse, onSignIn, onGetStarted 
           <View style={styles.topActions}>
             {!compact && (
               <Pressable accessibilityRole="button" onPress={onBrowse} style={styles.browseLink}>
-                <Text style={styles.browseLinkText}>BROWSE DEMO</Text>
+                <Text style={styles.browseLinkText}>BROWSE</Text>
               </Pressable>
             )}
             <Pressable accessibilityRole="button" onPress={onSignIn} style={[styles.signInButton, compact && styles.signInButtonCompact]}>
@@ -162,7 +162,6 @@ export default function WelcomePage({ compact, onBrowse, onSignIn, onGetStarted 
           </Text>
           <View style={styles.heroActions}>
             <EntryButton onPress={onBrowse}>Explore the catalog</EntryButton>
-            <EntryButton onPress={() => window.location.assign("/play4u.html")} tone="quiet">Browse Play4u titles</EntryButton>
             <EntryButton onPress={onGetStarted} tone="quiet">Get Started</EntryButton>
           </View>
           <Text style={styles.heroDisclaimer}>NO ACCOUNT · NO STREAMING PROVIDER · JUST THE FRONT-END DEMO</Text>

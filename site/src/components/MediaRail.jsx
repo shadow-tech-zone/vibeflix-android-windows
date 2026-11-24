@@ -11,9 +11,10 @@ import { COLORS, PAGE_GUTTER } from "../theme.js";
 
 function MediaCard({ item, compact, onSelect }) {
   const [hovered, setHovered] = useState(false);
+  const badge = item.isPublicCatalog ? item.maturity : item.match;
   return (
     <Pressable
-      accessibilityLabel={`${item.title}, ${item.type}, ${item.isPublicCatalog ? "public title metadata" : item.match}`}
+      accessibilityLabel={`${item.title}, ${item.type}`}
       accessibilityRole="button"
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
@@ -28,20 +29,20 @@ function MediaCard({ item, compact, onSelect }) {
       <View style={[styles.imageWrap, compact && styles.imageWrapCompact]}>
         {item.cardArt ? (
           <Image
-            accessibilityLabel={item.isPublicCatalog ? `Public poster for ${item.title}` : `Original fictional artwork for ${item.title}`}
+            accessibilityLabel={`Poster for ${item.title}`}
             resizeMode="cover"
             source={{ uri: item.cardArt }}
             style={styles.image}
           />
         ) : (
           <View pointerEvents="none" style={styles.posterFallback}>
-            <Text style={styles.posterFallbackText}>{item.isPublicCatalog ? "PLAY4U" : item.title}</Text>
+            <Text numberOfLines={3} style={styles.posterFallbackText}>{item.title}</Text>
           </View>
         )}
         <View pointerEvents="none" style={styles.imageShade} />
         <View style={styles.cardTopLine}>
           <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
-          <Text style={styles.matchTag}>{item.match}</Text>
+          {badge ? <Text style={styles.matchTag}>{badge}</Text> : null}
         </View>
         {item.progress > 0 && (
           <View style={styles.progressTrack}>
@@ -61,7 +62,7 @@ function MediaCard({ item, compact, onSelect }) {
       <View style={styles.cardCopy}>
         <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
         <Text numberOfLines={1} style={styles.cardSubline}>
-          {item.progress > 0 ? item.progressLabel : `${item.year}  ·  ${item.genres[0]}`}
+          {item.progress > 0 ? item.progressLabel : [item.year, item.genres[0]].filter(Boolean).join("  ·  ")}
         </Text>
       </View>
     </Pressable>
