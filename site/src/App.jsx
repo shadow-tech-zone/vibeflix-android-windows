@@ -595,7 +595,7 @@ export default function App() {
         </View>
       )}
 
-      <Footer onOpenWelcome={() => setScreen("welcome")} catalogMode={play4uMode && activeTab !== "My List"} />
+      <Footer onOpenWelcome={() => setScreen("welcome")} catalogMode={play4uMode} />
       <TitleDetailsModal
         item={selectedItem}
         saved={selectedItem && !selectedItem.isPublicCatalog ? savedSet.has(selectedItem.id) : false}
