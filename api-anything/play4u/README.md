@@ -6,7 +6,7 @@ The canonical two-operation API Anything spec is `site/src/api/play4u.json`. Vib
 
 ## Test directly on Vercel
 
-After deploying the `site` project, open `/play4u.html` on that Vercel deployment. It enters the Play4u view inside VibeFlix's existing browse UI, with the shared navigation, title-card rails, and details modal plus catalog search, filters, and page navigation. Its same-origin serverless function makes live requests to Play4u's public pages. `/play4u-test.html` redirects to the catalog page. The VibeFlix landing page also has a “Browse Play4u titles” button.
+After deploying the `site` project, open `/play4u.html` on that Vercel deployment. It places Play4u results in VibeFlix's existing browse UI, using its shared navigation, spotlight hero, title-card rails, and details modal plus catalog search, filters, and page navigation. Its same-origin serverless function makes live requests to Play4u's public pages. `/play4u-test.html` redirects to the catalog page. The VibeFlix landing page also has a “Browse Play4u titles” button.
 
 The JSON endpoint is `GET /api/play4u`:
 

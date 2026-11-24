@@ -7,38 +7,60 @@ import { COLORS } from "../theme.js";
 export default function SpotlightHero({ item, compact, navigationProps, onPlay, onMoreInfo }) {
   return (
     <View style={[styles.hero, compact && styles.heroCompact]}>
-      <Image
-        accessibilityLabel={`Illustrated backdrop for ${item.title}`}
-        resizeMode="cover"
-        source={{ uri: item.art }}
-        style={styles.artwork}
-      />
+      {item.art ? (
+        <Image
+          accessibilityLabel={item.isPublicCatalog ? `Public poster for ${item.title}` : `Illustrated backdrop for ${item.title}`}
+          resizeMode="cover"
+          source={{ uri: item.art }}
+          style={styles.artwork}
+        />
+      ) : (
+        <View pointerEvents="none" style={styles.artworkFallback} />
+      )}
       <View pointerEvents="none" style={styles.backdropShade} />
       <View pointerEvents="none" style={styles.leftShade} />
       <View pointerEvents="none" style={styles.bottomShade} />
       <Navigation {...navigationProps} compact={compact} />
 
       <View style={[styles.content, compact && styles.contentCompact]}>
-        <Text style={styles.kicker}>{`VIBEFLIX ${item.type.toUpperCase()}`}</Text>
+        <Text style={styles.kicker}>{item.isPublicCatalog ? "PLAY4U · PUBLIC TITLE" : `VIBEFLIX ${item.type.toUpperCase()}`}</Text>
         <Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}>
           {item.title}
         </Text>
         <View style={styles.metadata}>
-          <Text style={styles.match}>{item.match}</Text>
-          <Text style={styles.metaText}>{item.year}</Text>
-          <Text style={styles.dot}>•</Text>
-          <Text style={styles.metaText}>{item.maturity}</Text>
-          <Text style={styles.dot}>•</Text>
-          <Text style={styles.metaText}>{item.length}</Text>
+          {item.isPublicCatalog ? (
+            <>
+              <Text style={styles.match}>PUBLIC</Text>
+              {item.year ? <Text style={styles.metaText}>{item.year}</Text> : null}
+              {item.maturity ? <Text style={styles.metaText}>{item.maturity}</Text> : null}
+            </>
+          ) : (
+            <>
+              <Text style={styles.match}>{item.match}</Text>
+              <Text style={styles.metaText}>{item.year}</Text>
+              <Text style={styles.dot}>•</Text>
+              <Text style={styles.metaText}>{item.maturity}</Text>
+              <Text style={styles.dot}>•</Text>
+              <Text style={styles.metaText}>{item.length}</Text>
+            </>
+          )}
         </View>
         <Text style={[styles.synopsis, compact && styles.synopsisCompact]} numberOfLines={4}>
           {item.synopsis}
         </Text>
         <View style={styles.actions}>
-          <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
-          <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
-            More Info
-          </ActionButton>
+          {item.isPublicCatalog ? (
+            <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
+              More Info
+            </ActionButton>
+          ) : (
+            <>
+              <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
+              <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
+                More Info
+              </ActionButton>
+            </>
+          )}
         </View>
       </View>
 
@@ -60,6 +82,7 @@ const styles = StyleSheet.create({
   },
   heroCompact: { height: 570, minHeight: 530 },
   artwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
+  artworkFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#292929" },
   backdropShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.08)" },
   leftShade: { position: "absolute", top: 0, left: 0, bottom: 0, width: "68%", backgroundColor: "rgba(0,0,0,0.35)" },
   bottomShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 240, backgroundColor: "rgba(20,20,20,0.54)" },

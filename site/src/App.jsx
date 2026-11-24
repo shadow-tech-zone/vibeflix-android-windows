@@ -132,6 +132,7 @@ export default function App() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(startInPlay4u);
   const [query, setQuery] = useState("");
+  const [play4uSearchText, setPlay4uSearchText] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [playingItem, setPlayingItem] = useState(null);
   const [play4uItems, setPlay4uItems] = useState([]);
@@ -172,11 +173,13 @@ export default function App() {
 
   const loadPlay4u = async (page = 1, searchText = query, filters = play4uFilters) => {
     const requestId = ++play4uRequestRef.current;
+    const committedSearch = searchText.trim();
     const params = new URLSearchParams({ operation: "browseTitles", page: String(page) });
-    if (searchText.trim()) params.set("query", searchText.trim());
+    if (committedSearch) params.set("query", committedSearch);
     for (const [name, value] of Object.entries(filters)) if (value) params.set(name, value);
 
     setPlay4uLoading(true);
+    setPlay4uSearchText(committedSearch);
     setPlay4uError("");
     setPlay4uItems([]);
     setPlay4uPage(page);
@@ -234,16 +237,27 @@ export default function App() {
     return items;
   }, [activeTab, profileCatalog, query, savedSet]);
 
-  const isHome = activeTab === "Home" && query.trim().length === 0;
-  const featuredItem = profileCatalog.find((item) => item.id === FEATURED_TITLE_ID) || profileCatalog[0];
+  const isLocalHome = activeTab === "Home" && query.trim().length === 0;
+  const isPlay4uHome = activeTab === "Play4u" && !play4uSearchText && play4uItems.length > 0;
+  const isHome = isLocalHome || isPlay4uHome;
+  const featuredItem = isPlay4uHome
+    ? play4uItems[0]
+    : profileCatalog.find((item) => item.id === FEATURED_TITLE_ID) || profileCatalog[0];
 
   const rows = useMemo(() => {
     if (activeTab === "Play4u") {
-      return [{
+      const results = [{
         id: "play4u-results",
-        title: query.trim() ? `Search results for “${query.trim()}”` : "Public titles on Play4u",
+        title: play4uSearchText ? `Search results for “${play4uSearchText}”` : "Popular on Play4u",
         items: play4uItems,
       }];
+      if (!play4uSearchText && play4uItems.length) {
+        const movies = play4uItems.filter((item) => item.kind === "movie");
+        const series = play4uItems.filter((item) => item.kind === "series");
+        if (movies.length) results.push({ id: "play4u-movies", title: "Movies on Play4u", items: movies });
+        if (series.length) results.push({ id: "play4u-series", title: "Series on Play4u", items: series });
+      }
+      return results;
     }
     if (query.trim()) {
       return [{ id: "search-results", title: `Search results for “${query.trim()}”`, items: visibleItems }];
@@ -258,8 +272,8 @@ export default function App() {
       return [{ id: activeTab.toLowerCase(), title: activeTab, items: visibleItems }];
     }
     return buildHomeRows(profileCatalog, profile);
-  }, [activeTab, profile, profileCatalog, query, visibleItems, play4uItems]);
-  const hasPlay4uCriteria = Boolean(query.trim() || Object.values(play4uFilters).some(Boolean));
+  }, [activeTab, profile, profileCatalog, query, visibleItems, play4uItems, play4uSearchText]);
+  const hasPlay4uCriteria = Boolean(play4uSearchText || Object.values(play4uFilters).some(Boolean));
 
   const handlePageScroll = (event) => {
     const scrollY =
@@ -300,6 +314,13 @@ export default function App() {
 
   const handleQuerySubmit = () => {
     if (activeTab === "Play4u") loadPlay4u(1, query, play4uFilters);
+  };
+
+  const handleQueryChange = (value) => {
+    setQuery(value);
+    if (activeTab === "Play4u" && !value.trim() && play4uSearchText) {
+      loadPlay4u(1, "", play4uFilters);
+    }
   };
 
   const handlePlay4uFilterChange = (name, value) => {
@@ -373,12 +394,12 @@ export default function App() {
     searchOpen,
     onSearchToggle: handleSearchToggle,
     query,
-    onQueryChange: setQuery,
+    onQueryChange: handleQueryChange,
     onQuerySubmit: handleQuerySubmit,
   };
 
   const pageTitle = activeTab === "Play4u"
-    ? "Play4u Catalog"
+    ? (play4uSearchText ? "Search results" : "Play4u Catalog")
     : query.trim()
       ? "Search"
       : activeTab === "My List"
@@ -443,7 +464,7 @@ export default function App() {
           compact={compact}
           navigationProps={navigationProps}
           onPlay={handlePlay}
-          onMoreInfo={setSelectedItem}
+          onMoreInfo={handleSelectItem}
         />
       ) : (
         <View style={[styles.catalogHeader, compact && styles.catalogHeaderCompact]}>
@@ -474,16 +495,19 @@ export default function App() {
                 title="The public catalog is temporarily unavailable"
                 message={play4uError}
                 actionLabel="Try again"
-                onAction={() => loadPlay4u(play4uPage, query, play4uFilters)}
+                onAction={() => loadPlay4u(play4uPage, play4uSearchText, play4uFilters)}
                 compact={compact}
               />
             ) : play4uItems.length ? (
-              <MediaRail
-                title={rows[0]?.title || "Public titles on Play4u"}
-                items={play4uItems}
-                compact={compact}
-                onSelect={handleSelectItem}
-              />
+              rows.map((row) => (
+                <MediaRail
+                  key={row.id}
+                  title={row.title}
+                  items={row.items}
+                  compact={compact}
+                  onSelect={handleSelectItem}
+                />
+              ))
             ) : (
               <CatalogFeedback
                 title="No public titles found"
@@ -499,7 +523,7 @@ export default function App() {
                   accessibilityLabel="Previous catalog page"
                   accessibilityRole="button"
                   disabled={play4uLoading || play4uPage <= 1}
-                  onPress={() => loadPlay4u(play4uPage - 1, query, play4uFilters)}
+                  onPress={() => loadPlay4u(play4uPage - 1, play4uSearchText, play4uFilters)}
                   style={[styles.pageButton, (play4uLoading || play4uPage <= 1) && styles.pageButtonDisabled]}
                 >
                   <Text style={styles.pageButtonText}>Previous</Text>
@@ -509,7 +533,7 @@ export default function App() {
                   accessibilityLabel="Next catalog page"
                   accessibilityRole="button"
                   disabled={play4uLoading || !play4uHasMore}
-                  onPress={() => loadPlay4u(play4uPage + 1, query, play4uFilters)}
+                  onPress={() => loadPlay4u(play4uPage + 1, play4uSearchText, play4uFilters)}
                   style={[styles.pageButton, (play4uLoading || !play4uHasMore) && styles.pageButtonDisabled]}
                 >
                   <Text style={styles.pageButtonText}>Next</Text>
