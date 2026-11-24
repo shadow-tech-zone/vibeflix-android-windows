@@ -500,19 +500,26 @@ export default function App() {
 
       {play4uMode && activeTab !== "My List" ? (
         <>
-          <Play4uFilterBar
-            filters={play4uFilters}
-            onChange={handlePlay4uFilterChange}
-            onApply={() => loadPlay4u(1, query, play4uFilters)}
-            onClear={handleClearPlay4u}
-            loading={play4uLoading}
-            compact={compact}
-          />
-          <View style={[styles.railsWrap, styles.play4uRailsWrap]}>
+          {!isPlay4uHome && (
+            <Play4uFilterBar
+              filters={play4uFilters}
+              onChange={handlePlay4uFilterChange}
+              onApply={() => loadPlay4u(1, query, play4uFilters)}
+              onClear={handleClearPlay4u}
+              loading={play4uLoading}
+              compact={compact}
+            />
+          )}
+          <View style={[
+            styles.railsWrap,
+            styles.play4uRailsWrap,
+            isPlay4uHome && styles.catalogHomeRailsWrap,
+            isPlay4uHome && compact && styles.catalogHomeRailsWrapCompact,
+          ]}>
             {play4uLoading || !play4uLoaded ? (
               <CatalogFeedback
                 title="Loading titles…"
-                message="Loading the latest movie and series picks."
+                message="Loading movie and series titles."
                 compact={compact}
               />
             ) : play4uError ? (
@@ -622,6 +629,8 @@ const styles = StyleSheet.create({
   catalogTitleCompact: { fontSize: 28 },
   railsWrap: { paddingTop: 21, paddingBottom: 19 },
   play4uRailsWrap: { paddingTop: 6 },
+  catalogHomeRailsWrap: { position: "relative", zIndex: 3, marginTop: -104, paddingTop: 0 },
+  catalogHomeRailsWrapCompact: { marginTop: -74 },
   homeRailsWrap: { position: "relative", zIndex: 3, marginTop: -76, paddingTop: 0 },
   homeRailsWrapCompact: { marginTop: -48 },
   noResults: { minHeight: 230, alignItems: "center", justifyContent: "center", paddingHorizontal: 22, paddingVertical: 42 },

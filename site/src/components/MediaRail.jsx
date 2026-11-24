@@ -16,6 +16,7 @@ function MediaCard({ item, compact, onSelect }) {
   const badge = catalogPoster ? item.maturity : item.match;
   return (
     <Pressable
+      testID="media-card"
       accessibilityLabel={`${item.title}, ${item.type}`}
       accessibilityHint={catalogPoster ? "Open title information" : "Open title details"}
       accessibilityRole="button"
@@ -60,9 +61,14 @@ function MediaCard({ item, compact, onSelect }) {
             <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
           </View>
         )}
-        {hovered && (
+        {(hovered || platformHovered) && (
           <View pointerEvents="none" style={styles.hoverCaption}>
             <Text numberOfLines={1} style={styles.hoverTitle}>{item.title}</Text>
+            <Text numberOfLines={1} style={styles.hoverInfo}>
+              {[item.type, item.year, item.isPublicCatalog ? item.maturity : item.match]
+                .filter(Boolean)
+                .join("  ·  ")}
+            </Text>
             <Text style={styles.hoverMeta}>MORE INFO  ›</Text>
           </View>
         )}
@@ -178,18 +184,18 @@ export default function MediaRail({ title, items, compact, onSelect }) {
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 30 },
+  section: { marginBottom: 34 },
   heading: { minHeight: 34, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: PAGE_GUTTER, marginBottom: 8 },
   headingCompact: { paddingHorizontal: 20, marginBottom: 5 },
-  rowTitle: { color: COLORS.text, fontFamily: "Arial", fontSize: 19, fontWeight: "700", letterSpacing: -0.2 },
-  rowTitleCompact: { fontSize: 16 },
+  rowTitle: { color: COLORS.text, fontFamily: "Arial", fontSize: 21, fontWeight: "700", letterSpacing: -0.3 },
+  rowTitleCompact: { fontSize: 17 },
   exploreButton: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 4 },
-  exploreText: { color: "#b3b3b3", fontFamily: "Arial", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
+  exploreText: { color: "#b3b3b3", fontFamily: "Arial", fontSize: 10, fontWeight: "700", letterSpacing: 0.35 },
   exploreArrow: { color: "#b3b3b3", fontFamily: "Arial", fontSize: 17, lineHeight: 20 },
   railContainer: { position: "relative", minHeight: 180 },
   railContainerCompact: { minHeight: 149 },
-  catalogRailContainer: { minHeight: 286 },
-  catalogRailContainerCompact: { minHeight: 245 },
+  catalogRailContainer: { minHeight: 320 },
+  catalogRailContainerCompact: { minHeight: 260 },
   railControls: { position: "absolute", zIndex: 6, top: 0, right: 0, bottom: 0, left: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 2, opacity: 0 },
   railControlsVisible: { opacity: 1 },
   railControlsCompact: { display: "none" },
@@ -199,16 +205,16 @@ const styles = StyleSheet.create({
   railControlText: { color: COLORS.white, fontFamily: "Arial", fontSize: 34, fontWeight: "400", lineHeight: 40 },
   railContent: { gap: 10, paddingHorizontal: PAGE_GUTTER, paddingTop: 5, paddingBottom: 8 },
   railContentCompact: { gap: 8, paddingHorizontal: 20 },
-  card: { width: 232, overflow: "hidden", borderRadius: 4, backgroundColor: COLORS.surface, transform: [{ scale: 1 }], zIndex: 1 },
+  card: { width: 232, overflow: "hidden", borderRadius: 6, backgroundColor: COLORS.surface, transform: [{ scale: 1 }], zIndex: 1 },
   cardCompact: { width: 180 },
-  catalogCard: { width: 156 },
-  catalogCardCompact: { width: 128 },
-  cardHover: { transform: [{ scale: 1.045 }], zIndex: 5 },
+  catalogCard: { width: 176 },
+  catalogCardCompact: { width: 136 },
+  cardHover: { transform: [{ scale: 1.065 }], zIndex: 5 },
   cardPressed: { transform: [{ scale: 0.985 }] },
   imageWrap: { position: "relative", width: "100%", height: 132, overflow: "hidden", backgroundColor: "#292929" },
   imageWrapCompact: { height: 103 },
-  catalogImageWrap: { height: 234 },
-  catalogImageWrapCompact: { height: 192 },
+  catalogImageWrap: { height: 264 },
+  catalogImageWrapCompact: { height: 204 },
   image: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
   posterFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "#242424" },
   posterFallbackText: { color: "#8c8c8c", fontFamily: "Arial", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
@@ -218,14 +224,15 @@ const styles = StyleSheet.create({
   matchTag: { color: COLORS.match, fontFamily: "Arial", fontSize: 8, fontWeight: "800", textShadowColor: "rgba(0,0,0,0.75)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   progressTrack: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3, backgroundColor: "rgba(255,255,255,0.48)" },
   progressFill: { height: 3, backgroundColor: COLORS.red },
-  hoverCaption: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 52, justifyContent: "flex-end", paddingHorizontal: 10, paddingBottom: 8, backgroundColor: "rgba(0,0,0,0.72)" },
-  hoverTitle: { color: COLORS.white, fontFamily: "Arial", fontSize: 11, fontWeight: "700" },
-  hoverMeta: { marginTop: 3, color: "#b3b3b3", fontFamily: "Arial", fontSize: 7, fontWeight: "700", letterSpacing: 0.6 },
+  hoverCaption: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 82, justifyContent: "flex-end", paddingHorizontal: 11, paddingTop: 15, paddingBottom: 10, backgroundColor: "rgba(0,0,0,0.82)" },
+  hoverTitle: { color: COLORS.white, fontFamily: "Arial", fontSize: 12, fontWeight: "700" },
+  hoverInfo: { marginTop: 4, color: "#d0d0d0", fontFamily: "Arial", fontSize: 8 },
+  hoverMeta: { marginTop: 5, color: "#b3b3b3", fontFamily: "Arial", fontSize: 7, fontWeight: "700", letterSpacing: 0.6 },
   playDot: { position: "absolute", right: 8, bottom: 8, width: 27, height: 27, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.82)", borderRadius: 16, backgroundColor: "rgba(8,8,8,0.6)" },
   infoDot: { borderColor: "rgba(255,255,255,0.82)" },
   playIcon: { marginLeft: 2, color: COLORS.white, fontFamily: "Arial", fontSize: 9 },
   infoIcon: { marginLeft: 0, fontSize: 13, fontWeight: "800" },
   cardCopy: { paddingHorizontal: 9, paddingTop: 8, paddingBottom: 9 },
-  cardTitle: { color: "#f5f5f5", fontFamily: "Arial", fontSize: 11, fontWeight: "700" },
-  cardSubline: { marginTop: 4, color: "#969696", fontFamily: "Arial", fontSize: 8 },
+  cardTitle: { color: "#f5f5f5", fontFamily: "Arial", fontSize: 12, fontWeight: "700" },
+  cardSubline: { marginTop: 4, color: "#969696", fontFamily: "Arial", fontSize: 9 },
 });

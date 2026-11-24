@@ -53,6 +53,37 @@ input:focus-visible {
   transition: background-color 220ms ease, border-color 220ms ease;
 }
 
+#spotlight-catalog-backdrop {
+  filter: blur(24px) brightness(0.43) saturate(1.1);
+  transform: scale(1.13);
+}
+
+#spotlight-catalog-poster {
+  filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.72));
+}
+
+#spotlight-backdrop-shade {
+  background-image: linear-gradient(90deg, #141414 0%, rgba(20, 20, 20, 0.88) 24%, rgba(20, 20, 20, 0.58) 49%, rgba(20, 20, 20, 0.1) 100%);
+}
+
+#spotlight-left-shade {
+  background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.2) 65%, transparent 100%);
+}
+
+#spotlight-bottom-shade {
+  background-image: linear-gradient(0deg, #141414 0%, rgba(20, 20, 20, 0.92) 12%, rgba(20, 20, 20, 0.43) 55%, transparent 100%);
+}
+
+[data-testid="media-card"] {
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+[data-testid="media-card"]:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.58);
+  transform-origin: center center;
+}
+
 [data-testid="media-rail-controls"] {
   transition: opacity 160ms ease;
 }
@@ -69,6 +100,9 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   #vibeflix-navigation,
+  #spotlight-catalog-backdrop,
+  #spotlight-catalog-poster,
+  [data-testid="media-card"],
   [data-testid="media-rail-controls"] {
     transition: none;
   }

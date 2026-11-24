@@ -13,9 +13,20 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
 
   return (
     <View style={[styles.hero, compact && styles.heroCompact]}>
+      {item.isPublicCatalog && item.art && !imageFailed ? (
+        <Image
+          accessible={false}
+          nativeID="spotlight-catalog-backdrop"
+          onError={() => setImageFailed(true)}
+          resizeMode="cover"
+          source={{ uri: item.art }}
+          style={styles.catalogBackdrop}
+        />
+      ) : null}
       {item.art && !imageFailed ? (
         <Image
           accessibilityLabel={item.isPublicCatalog ? `Poster for ${item.title}` : `Illustrated backdrop for ${item.title}`}
+          nativeID={item.isPublicCatalog ? "spotlight-catalog-poster" : undefined}
           onError={() => setImageFailed(true)}
           resizeMode={item.isPublicCatalog ? "contain" : "cover"}
           source={{ uri: item.art }}
@@ -34,9 +45,9 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
       ) : (
         <View pointerEvents="none" style={styles.artworkFallback} />
       )}
-      <View pointerEvents="none" style={styles.backdropShade} />
-      <View pointerEvents="none" style={styles.leftShade} />
-      <View pointerEvents="none" style={styles.bottomShade} />
+      <View pointerEvents="none" nativeID="spotlight-backdrop-shade" style={styles.backdropShade} />
+      <View pointerEvents="none" nativeID="spotlight-left-shade" style={styles.leftShade} />
+      <View pointerEvents="none" nativeID="spotlight-bottom-shade" style={styles.bottomShade} />
       <Navigation {...navigationProps} compact={compact} />
 
       <View
@@ -76,7 +87,7 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
         ) : null}
         <View style={styles.actions}>
           {item.isPublicCatalog ? (
-            <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
+            <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)}>
               More Info
             </ActionButton>
           ) : (
@@ -103,28 +114,30 @@ const styles = StyleSheet.create({
   hero: {
     position: "relative",
     width: "100%",
-    height: 670,
-    minHeight: 570,
+    height: "76vh",
+    minHeight: 610,
+    maxHeight: 790,
     overflow: "hidden",
     backgroundColor: COLORS.background,
   },
-  heroCompact: { height: 570, minHeight: 530 },
+  heroCompact: { height: "74vh", minHeight: 540, maxHeight: 640 },
   artwork: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
   artworkFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#292929" },
-  catalogArtwork: { position: "absolute", top: "11%", right: "7%", width: "36%", height: "76%", borderRadius: 6, backgroundColor: "#252525" },
-  catalogArtworkCompact: { top: "8%", right: "5%", width: "32%", height: "34%", borderRadius: 5 },
-  catalogArtworkFallback: { position: "absolute", top: "11%", right: "7%", width: "36%", height: "76%", alignItems: "center", justifyContent: "center", padding: 18, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, backgroundColor: "#252525" },
-  catalogArtworkFallbackCompact: { top: "8%", right: "5%", width: "32%", height: "34%", padding: 9 },
+  catalogBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", opacity: 0.85 },
+  catalogArtwork: { position: "absolute", top: "9%", right: "8%", width: "34%", height: "80%", borderRadius: 6, backgroundColor: "#252525" },
+  catalogArtworkCompact: { top: "7%", right: "5%", width: "38%", height: "46%", borderRadius: 5 },
+  catalogArtworkFallback: { position: "absolute", top: "9%", right: "8%", width: "34%", height: "80%", alignItems: "center", justifyContent: "center", padding: 18, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, backgroundColor: "#252525" },
+  catalogArtworkFallbackCompact: { top: "7%", right: "5%", width: "38%", height: "46%", padding: 9 },
   catalogArtworkFallbackText: { color: "#999", fontFamily: "Arial", fontSize: 12, fontWeight: "700", textAlign: "center" },
-  backdropShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.08)" },
-  leftShade: { position: "absolute", top: 0, left: 0, bottom: 0, width: "68%", backgroundColor: "rgba(0,0,0,0.35)" },
-  bottomShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 240, backgroundColor: "rgba(20,20,20,0.54)" },
-  content: { position: "absolute", zIndex: 2, left: "4.3%", bottom: 105, width: 550, maxWidth: "55%" },
-  contentCompact: { left: 20, right: 18, bottom: 62, width: "auto", maxWidth: 470 },
-  contentCatalogCompact: { right: "auto", bottom: 46, width: "55%", maxWidth: 470 },
+  backdropShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.16)" },
+  leftShade: { position: "absolute", top: 0, left: 0, bottom: 0, width: "70%", backgroundColor: "rgba(0,0,0,0.4)" },
+  bottomShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 280, backgroundColor: "rgba(20,20,20,0.74)" },
+  content: { position: "absolute", zIndex: 2, left: "4.3%", bottom: 112, width: 620, maxWidth: "54%" },
+  contentCompact: { left: 20, right: 18, bottom: 54, width: "auto", maxWidth: 470 },
+  contentCatalogCompact: { right: "auto", bottom: 44, width: "57%", maxWidth: 470 },
   kicker: { marginBottom: 9, color: "#f5f5f1", fontFamily: "Arial", fontSize: 10, fontWeight: "700", letterSpacing: 1.7, textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
-  title: { color: COLORS.white, fontFamily: "Arial", fontSize: 58, fontWeight: "900", lineHeight: 64, letterSpacing: -1.7, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 8 },
-  titleCompact: { maxWidth: 400, fontSize: 40, lineHeight: 44, letterSpacing: -0.9 },
+  title: { color: COLORS.white, fontFamily: "Arial", fontSize: 62, fontWeight: "900", lineHeight: 68, letterSpacing: -1.9, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 8 },
+  titleCompact: { maxWidth: 400, fontSize: 38, lineHeight: 42, letterSpacing: -0.9 },
   metadata: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 13 },
   match: { color: COLORS.match, fontFamily: "Arial", fontSize: 11, fontWeight: "800" },
   metaText: { color: "#e5e5e5", fontFamily: "Arial", fontSize: 11, fontWeight: "500" },
