@@ -54,9 +54,9 @@ export default function TitleDetailsModal({ item, saved, onClose, onPlay, onTogg
                 ) : null}
                 <Text style={styles.infoLine}><Text style={styles.infoLabel}>Format: </Text>{item.type}</Text>
               </View>
-              {!item.isPublicCatalog && (
-                <View style={styles.actions}>
-                  <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
+              <View style={styles.actions}>
+                <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
+                {!item.isPublicCatalog && (
                   <Pressable
                     accessibilityLabel={saved ? "Remove from My List" : "Add to My List"}
                     accessibilityRole="button"
@@ -66,11 +66,11 @@ export default function TitleDetailsModal({ item, saved, onClose, onPlay, onTogg
                     <Text style={styles.listIcon}>{saved ? "✓" : "+"}</Text>
                     <Text style={styles.listText}>{saved ? "In My List" : "My List"}</Text>
                   </Pressable>
-                </View>
-              )}
+                )}
+              </View>
               <Text style={styles.disclaimer}>
                 {item.isPublicCatalog
-                  ? "Title information only · No playback or stream sources accessed"
+                  ? "Playback opens in the VibeFlix player when a stream is available."
                   : "Fictional demo title · Original VibeFlix artwork · No stream source connected"}
               </Text>
             </ScrollView>

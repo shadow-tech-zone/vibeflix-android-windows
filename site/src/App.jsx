@@ -613,7 +613,7 @@ export default function App() {
         onPlay={handlePlay}
         onToggleSaved={toggleSaved}
       />
-      <PlaybackOverlay item={playingItem} onClose={() => setPlayingItem(null)} />
+      <PlaybackOverlay key={playingItem?.id || "closed"} item={playingItem} onClose={() => setPlayingItem(null)} />
     </ScrollView>
   );
 }

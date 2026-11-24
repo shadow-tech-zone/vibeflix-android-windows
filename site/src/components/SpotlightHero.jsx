@@ -86,18 +86,10 @@ export default function SpotlightHero({ item, compact, navigationProps, onPlay, 
           </Text>
         ) : null}
         <View style={styles.actions}>
-          {item.isPublicCatalog ? (
-            <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)}>
-              More Info
-            </ActionButton>
-          ) : (
-            <>
-              <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
-              <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
-                More Info
-              </ActionButton>
-            </>
-          )}
+          <ActionButton icon="▶" onPress={() => onPlay(item)}>Play</ActionButton>
+          <ActionButton icon="ⓘ" onPress={() => onMoreInfo(item)} tone="quiet">
+            More Info
+          </ActionButton>
         </View>
       </View>
 

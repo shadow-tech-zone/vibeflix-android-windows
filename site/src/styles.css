@@ -53,6 +53,14 @@ input:focus-visible {
   transition: background-color 220ms ease, border-color 220ms ease;
 }
 
+#vibeflix-playback-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  object-fit: contain;
+}
+
 #spotlight-catalog-backdrop {
   filter: blur(24px) brightness(0.43) saturate(1.1);
   transform: scale(1.13);
