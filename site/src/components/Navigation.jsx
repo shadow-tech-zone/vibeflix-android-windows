@@ -5,11 +5,12 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Brand from "./Brand.jsx";
 import { COLORS } from "../theme.js";
 
-const TABS = ["Home", "TV Shows", "Movies", "New & Popular", "My List"];
+const TABS = ["Home", "TV Shows", "Movies", "New & Popular", "Play4u", "My List"];
 const PROFILES = ["Sam", "Kids"];
 
 export default function Navigation({
@@ -23,7 +24,10 @@ export default function Navigation({
   onSearchToggle,
   query,
   onQueryChange,
+  onQuerySubmit,
 }) {
+  const { width } = useWindowDimensions();
+  const navCompact = compact || width < 1040;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
@@ -41,11 +45,11 @@ export default function Navigation({
   return (
     <View
       nativeID="vibeflix-navigation"
-      style={[styles.header, compact && styles.headerCompact, scrolled && styles.headerScrolled]}
+      style={[styles.header, navCompact && styles.headerCompact, scrolled && styles.headerScrolled]}
     >
       <View style={styles.headerLeft}>
-        <Brand compact={compact} />
-        {!compact && (
+        <Brand compact={navCompact} />
+        {!navCompact && (
           <View style={styles.navItems}>
             {TABS.map((tab) => (
               <Pressable
@@ -63,16 +67,18 @@ export default function Navigation({
         )}
       </View>
 
-      <View style={[styles.headerRight, compact && styles.headerRightCompact]}>
+      <View style={[styles.headerRight, navCompact && styles.headerRightCompact]}>
         {searchOpen && (
-          <View style={[styles.searchBox, compact && styles.searchBoxCompact]}>
+          <View style={[styles.searchBox, navCompact && styles.searchBoxCompact]}>
             <Text style={styles.searchGlyph}>⌕</Text>
             <TextInput
-              accessibilityLabel="Search titles and genres"
+              accessibilityLabel={activeTab === "Play4u" ? "Search Play4u titles" : "Search titles and genres"}
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={120}
               onChangeText={onQueryChange}
-              placeholder="Titles, people, genres"
+              onSubmitEditing={onQuerySubmit}
+              placeholder={activeTab === "Play4u" ? "Search Play4u titles" : "Titles, people, genres"}
               placeholderTextColor="#b3b3b3"
               returnKeyType="search"
               style={styles.searchInput}
@@ -97,12 +103,12 @@ export default function Navigation({
             setProfileMenuOpen(false);
             onSearchToggle();
           }}
-          style={[styles.iconButton, compact && styles.iconButtonCompact]}
+          style={[styles.iconButton, navCompact && styles.iconButtonCompact]}
         >
           <Text style={styles.searchIcon}>{searchOpen ? "×" : "⌕"}</Text>
         </Pressable>
 
-        {compact ? (
+        {navCompact ? (
           !searchOpen && (
             <Pressable
               accessibilityRole="button"
@@ -122,7 +128,7 @@ export default function Navigation({
           </Pressable>
         )}
 
-        {(!compact || !searchOpen) && (
+        {(!navCompact || !searchOpen) && (
           <View style={styles.profileWrap}>
             <Pressable
               accessibilityLabel={`Profile: ${profile}`}
@@ -159,7 +165,7 @@ export default function Navigation({
         )}
       </View>
 
-      {compact && mobileMenuOpen && !searchOpen && (
+      {navCompact && mobileMenuOpen && !searchOpen && (
         <View style={styles.mobileMenu}>
           {TABS.map((tab) => (
             <Pressable

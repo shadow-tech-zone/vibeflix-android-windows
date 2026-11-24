@@ -16,4 +16,4 @@
 
 ## Verify before relying on it
 
-Use the Vercel catalog UI at `/play4u.html` for live browsing and title-detail checks. It calls the deployed API Anything function; tests under `site/test/` use offline fixtures and do not verify the live website. If a manual CLI verification is done later, run it on a network with Play4u access and a Chromium browser. Keep calls low-volume and observe Play4u's terms and rate limits.
+Use the Vercel catalog UI at `/play4u.html` for live browsing and title-detail checks. It opens inside the existing VibeFlix browse shell and calls the deployed API Anything function; tests under `site/test/` use offline fixtures and do not verify the live website. If a manual CLI verification is done later, run it on a network with Play4u access and a Chromium browser. Keep calls low-volume and observe Play4u's terms and rate limits.

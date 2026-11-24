@@ -13,7 +13,7 @@ function MediaCard({ item, compact, onSelect }) {
   const [hovered, setHovered] = useState(false);
   return (
     <Pressable
-      accessibilityLabel={`${item.title}, ${item.type}, ${item.match}`}
+      accessibilityLabel={`${item.title}, ${item.type}, ${item.isPublicCatalog ? "public title metadata" : item.match}`}
       accessibilityRole="button"
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
@@ -26,12 +26,18 @@ function MediaCard({ item, compact, onSelect }) {
       ]}
     >
       <View style={[styles.imageWrap, compact && styles.imageWrapCompact]}>
-        <Image
-          accessibilityLabel={`Original fictional artwork for ${item.title}`}
-          resizeMode="cover"
-          source={{ uri: item.cardArt }}
-          style={styles.image}
-        />
+        {item.cardArt ? (
+          <Image
+            accessibilityLabel={item.isPublicCatalog ? `Public poster for ${item.title}` : `Original fictional artwork for ${item.title}`}
+            resizeMode="cover"
+            source={{ uri: item.cardArt }}
+            style={styles.image}
+          />
+        ) : (
+          <View pointerEvents="none" style={styles.posterFallback}>
+            <Text style={styles.posterFallbackText}>{item.isPublicCatalog ? "PLAY4U" : item.title}</Text>
+          </View>
+        )}
         <View pointerEvents="none" style={styles.imageShade} />
         <View style={styles.cardTopLine}>
           <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
@@ -48,8 +54,8 @@ function MediaCard({ item, compact, onSelect }) {
             <Text style={styles.hoverMeta}>MORE INFO  ›</Text>
           </View>
         )}
-        <View pointerEvents="none" style={styles.playDot}>
-          <Text style={styles.playIcon}>▶</Text>
+        <View pointerEvents="none" style={[styles.playDot, item.isPublicCatalog && styles.infoDot]}>
+          <Text style={[styles.playIcon, item.isPublicCatalog && styles.infoIcon]}>{item.isPublicCatalog ? "i" : "▶"}</Text>
         </View>
       </View>
       <View style={styles.cardCopy}>
@@ -180,6 +186,8 @@ const styles = StyleSheet.create({
   imageWrap: { position: "relative", width: "100%", height: 132, overflow: "hidden", backgroundColor: "#292929" },
   imageWrapCompact: { height: 103 },
   image: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" },
+  posterFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "#242424" },
+  posterFallbackText: { color: "#8c8c8c", fontFamily: "Arial", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
   imageShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.15)" },
   cardTopLine: { position: "absolute", top: 8, left: 9, right: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   typeTag: { color: COLORS.white, fontFamily: "Arial", fontSize: 7, fontWeight: "800", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.75)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
@@ -190,7 +198,9 @@ const styles = StyleSheet.create({
   hoverTitle: { color: COLORS.white, fontFamily: "Arial", fontSize: 11, fontWeight: "700" },
   hoverMeta: { marginTop: 3, color: "#b3b3b3", fontFamily: "Arial", fontSize: 7, fontWeight: "700", letterSpacing: 0.6 },
   playDot: { position: "absolute", right: 8, bottom: 8, width: 27, height: 27, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.82)", borderRadius: 16, backgroundColor: "rgba(8,8,8,0.6)" },
+  infoDot: { borderColor: "rgba(255,255,255,0.82)" },
   playIcon: { marginLeft: 2, color: COLORS.white, fontFamily: "Arial", fontSize: 9 },
+  infoIcon: { marginLeft: 0, fontSize: 13, fontWeight: "800" },
   cardCopy: { paddingHorizontal: 9, paddingTop: 8, paddingBottom: 9 },
   cardTitle: { color: "#f5f5f5", fontFamily: "Arial", fontSize: 11, fontWeight: "700" },
   cardSubline: { marginTop: 4, color: "#969696", fontFamily: "Arial", fontSize: 8 },

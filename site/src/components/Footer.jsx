@@ -9,7 +9,7 @@ function openSource() {
   if (typeof window !== "undefined") window.open(SOURCE_URL, "_blank", "noopener,noreferrer");
 }
 
-export default function Footer({ onOpenWelcome }) {
+export default function Footer({ onOpenWelcome, catalogMode = false }) {
   return (
     <View style={styles.footer}>
       <View style={styles.topLine}>
@@ -17,7 +17,9 @@ export default function Footer({ onOpenWelcome }) {
         <Text style={styles.privateLabel}>PRIVATE PERSONAL PROJECT</Text>
       </View>
       <Text style={styles.disclaimer}>
-        VibeFlix is an independent UI experiment and is not affiliated with Netflix or any content provider. Titles and artwork are fictional and original. No accounts, licensed streams, or provider APIs are connected.
+        {catalogMode
+          ? "Play4u cards show public catalog metadata only. VibeFlix does not provide playback, embeds, or stream-source links."
+          : "VibeFlix is an independent UI experiment and is not affiliated with Netflix or any content provider. Titles and artwork are fictional and original. No accounts, licensed streams, or provider APIs are connected."}
       </Text>
       <View style={[styles.bottomLine, styles.bottomLineResponsive]}>
         <Text style={styles.copyright}>© 2026 VIBEFLIX · PERSONAL USE</Text>

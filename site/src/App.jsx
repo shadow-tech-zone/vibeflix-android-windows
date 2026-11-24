@@ -12,6 +12,7 @@ import Footer from "./components/Footer.jsx";
 import GetStartedFlow from "./components/GetStartedFlow.jsx";
 import MediaRail from "./components/MediaRail.jsx";
 import Navigation from "./components/Navigation.jsx";
+import Play4uFilterBar from "./components/Play4uFilterBar.jsx";
 import PlaybackOverlay from "./components/PlaybackOverlay.jsx";
 import SignInPage from "./components/SignInPage.jsx";
 import SpotlightHero from "./components/SpotlightHero.jsx";
@@ -39,6 +40,20 @@ function NoSearchResults({ query, onClear }) {
   );
 }
 
+function CatalogFeedback({ title, message, actionLabel, onAction, compact }) {
+  return (
+    <View style={[styles.catalogFeedback, compact && styles.catalogFeedbackCompact]}>
+      <Text accessibilityRole="header" style={styles.catalogFeedbackTitle}>{title}</Text>
+      <Text style={styles.catalogFeedbackText}>{message}</Text>
+      {actionLabel && onAction && (
+        <Pressable accessibilityRole="button" onPress={onAction} style={styles.catalogFeedbackButton}>
+          <Text style={styles.catalogFeedbackButtonText}>{actionLabel}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 function CatalogHeading({ title, compact }) {
   return (
     <View style={[styles.catalogHeading, compact && styles.catalogHeadingCompact]}>
@@ -49,18 +64,85 @@ function CatalogHeading({ title, compact }) {
   );
 }
 
+const DEFAULT_PLAY4U_FILTERS = { category: "", industry: "", language: "", genre: "" };
+
+function publicImageUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const url = new URL(value, "https://play4u.org");
+    return url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function publicTitleUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const url = new URL(value, "https://play4u.org");
+    return url.protocol === "https:" && ["play4u.org", "www.play4u.org"].includes(url.hostname) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function toPlay4uItem(item) {
+  const kind = item.kind === "series" ? "series" : "movie";
+  const type = kind === "series" ? "Series" : "Film";
+  const poster = publicImageUrl(item.poster || item.lazyPoster);
+  const title = typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Untitled";
+  const year = typeof item.year === "string" || typeof item.year === "number" ? String(item.year) : "";
+  const rating = typeof item.rating === "string" && item.rating.trim() ? item.rating.trim() : "Unrated";
+  const synopsis = typeof item.cardText === "string" && item.cardText.trim()
+    ? item.cardText.trim()
+    : "Public Play4u title metadata.";
+  return {
+    id: item.id,
+    kind,
+    type,
+    title,
+    year,
+    maturity: rating,
+    age: 18,
+    length: "",
+    genres: ["Public catalog"],
+    art: poster,
+    cardArt: poster,
+    progress: 0,
+    progressLabel: "",
+    match: "PUBLIC",
+    synopsis,
+    detailUrl: publicTitleUrl(item.detailUrl),
+    isPublicCatalog: true,
+  };
+}
+
 export default function App() {
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const pageScrollRef = useRef(null);
-  const [screen, setScreen] = useState("welcome");
-  const [activeTab, setActiveTab] = useState("Home");
+  const initialPlay4uRef = useRef(null);
+  if (initialPlay4uRef.current === null) {
+    initialPlay4uRef.current = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("catalog") === "play4u";
+  }
+  const startInPlay4u = initialPlay4uRef.current;
+  const [screen, setScreen] = useState(startInPlay4u ? "browse" : "welcome");
+  const [activeTab, setActiveTab] = useState(startInPlay4u ? "Play4u" : "Home");
   const [profile, setProfile] = useState("Sam");
   const [scrolled, setScrolled] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(startInPlay4u);
   const [query, setQuery] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [playingItem, setPlayingItem] = useState(null);
+  const [play4uItems, setPlay4uItems] = useState([]);
+  const [play4uPage, setPlay4uPage] = useState(1);
+  const [play4uFilters, setPlay4uFilters] = useState(DEFAULT_PLAY4U_FILTERS);
+  const [play4uHasMore, setPlay4uHasMore] = useState(false);
+  const [play4uLoaded, setPlay4uLoaded] = useState(false);
+  const [play4uLoading, setPlay4uLoading] = useState(false);
+  const [play4uError, setPlay4uError] = useState("");
+  const play4uRequestRef = useRef(0);
+  const titleRequestRef = useRef(0);
   const { savedSet, toggleSaved } = useMyList();
 
   const scrollPageToTop = () => {
@@ -72,10 +154,11 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
+        titleRequestRef.current += 1;
         setSelectedItem(null);
         setPlayingItem(null);
         setSearchOpen(false);
-        setQuery("");
+        if (activeTab !== "Play4u") setQuery("");
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -85,7 +168,48 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [activeTab]);
+
+  const loadPlay4u = async (page = 1, searchText = query, filters = play4uFilters) => {
+    const requestId = ++play4uRequestRef.current;
+    const params = new URLSearchParams({ operation: "browseTitles", page: String(page) });
+    if (searchText.trim()) params.set("query", searchText.trim());
+    for (const [name, value] of Object.entries(filters)) if (value) params.set(name, value);
+
+    setPlay4uLoading(true);
+    setPlay4uError("");
+    setPlay4uItems([]);
+    setPlay4uPage(page);
+    setPlay4uHasMore(false);
+    try {
+      const response = await fetch(`/api/play4u?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      let result;
+      try { result = await response.json(); } catch { throw new Error(`The catalog returned an unreadable response (${response.status}).`); }
+      if (!response.ok || !result?.ok) throw new Error(result?.reason || result?.error || `Catalog request failed (${response.status}).`);
+      if (requestId !== play4uRequestRef.current) return;
+      const items = Array.isArray(result.data)
+        ? result.data.filter((item) => item && typeof item === "object" && typeof item.id === "string" && /^tt[0-9]+$/.test(item.id))
+        : [];
+      setPlay4uItems(items.map(toPlay4uItem));
+      setPlay4uHasMore(items.length >= 30 && page < 100);
+    } catch (error) {
+      if (requestId !== play4uRequestRef.current) return;
+      setPlay4uError(error instanceof Error ? error.message : "Could not load the public catalog.");
+    } finally {
+      if (requestId === play4uRequestRef.current) {
+        setPlay4uLoading(false);
+        setPlay4uLoaded(true);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "Play4u") loadPlay4u(1, query, play4uFilters);
+  }, [activeTab]);
 
   const profileCatalog = useMemo(
     () => CATALOG.filter((item) => profile !== "Kids" || item.age <= 13),
@@ -114,6 +238,13 @@ export default function App() {
   const featuredItem = profileCatalog.find((item) => item.id === FEATURED_TITLE_ID) || profileCatalog[0];
 
   const rows = useMemo(() => {
+    if (activeTab === "Play4u") {
+      return [{
+        id: "play4u-results",
+        title: query.trim() ? `Search results for “${query.trim()}”` : "Public titles on Play4u",
+        items: play4uItems,
+      }];
+    }
     if (query.trim()) {
       return [{ id: "search-results", title: `Search results for “${query.trim()}”`, items: visibleItems }];
     }
@@ -127,7 +258,8 @@ export default function App() {
       return [{ id: activeTab.toLowerCase(), title: activeTab, items: visibleItems }];
     }
     return buildHomeRows(profileCatalog, profile);
-  }, [activeTab, profile, profileCatalog, query, visibleItems]);
+  }, [activeTab, profile, profileCatalog, query, visibleItems, play4uItems]);
+  const hasPlay4uCriteria = Boolean(query.trim() || Object.values(play4uFilters).some(Boolean));
 
   const handlePageScroll = (event) => {
     const scrollY =
@@ -141,9 +273,11 @@ export default function App() {
 
   const handleTabChange = (tab) => {
     scrollPageToTop();
+    const alreadyOnPlay4u = tab === "Play4u" && activeTab === "Play4u";
     setActiveTab(tab);
-    setSearchOpen(false);
+    setSearchOpen(tab === "Play4u");
     setQuery("");
+    if (alreadyOnPlay4u) loadPlay4u(1, "", play4uFilters);
   };
 
   const handleProfileChange = (name) => {
@@ -157,10 +291,71 @@ export default function App() {
   const handleSearchToggle = () => {
     if (searchOpen) {
       setSearchOpen(false);
-      setQuery("");
+      if (activeTab !== "Play4u") setQuery("");
     } else {
       scrollPageToTop();
       setSearchOpen(true);
+    }
+  };
+
+  const handleQuerySubmit = () => {
+    if (activeTab === "Play4u") loadPlay4u(1, query, play4uFilters);
+  };
+
+  const handlePlay4uFilterChange = (name, value) => {
+    setPlay4uFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleClearPlay4u = () => {
+    setPlay4uFilters(DEFAULT_PLAY4U_FILTERS);
+    setQuery("");
+    loadPlay4u(1, "", DEFAULT_PLAY4U_FILTERS);
+  };
+
+  const handleCloseDetails = () => {
+    titleRequestRef.current += 1;
+    setSelectedItem(null);
+  };
+
+  const handleSelectItem = async (item) => {
+    if (!item.isPublicCatalog) {
+      setSelectedItem(item);
+      return;
+    }
+
+    const requestId = ++titleRequestRef.current;
+    setSelectedItem({ ...item, detailLoading: true, detailError: "", synopsis: "Loading public title details…" });
+    const params = new URLSearchParams({ operation: "getTitle", kind: item.kind, id: item.id });
+    try {
+      const response = await fetch(`/api/play4u?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      let result;
+      try { result = await response.json(); } catch { throw new Error(`Title details returned an unreadable response (${response.status}).`); }
+      if (!response.ok || !result?.ok) throw new Error(result?.reason || result?.error || `Title details failed (${response.status}).`);
+      if (requestId !== titleRequestRef.current) return;
+      const detail = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (!detail || typeof detail !== "object") throw new Error("No public title details were returned.");
+      setSelectedItem((current) => current?.id === item.id ? {
+        ...current,
+        title: detail.title || detail.pageTitle || current.title,
+        art: publicImageUrl(detail.poster) || current.art,
+        synopsis: detail.description || detail.metaDescription || "No public description is available.",
+        length: detail.contentType || current.length,
+        canonicalUrl: publicTitleUrl(detail.canonicalUrl),
+        detailLoading: false,
+        detailError: "",
+      } : current);
+    } catch (error) {
+      if (requestId !== titleRequestRef.current) return;
+      setSelectedItem((current) => current?.id === item.id ? {
+        ...current,
+        detailLoading: false,
+        detailError: error instanceof Error ? error.message : "Could not load title details.",
+        synopsis: "Public title details could not be loaded right now.",
+      } : current);
     }
   };
 
@@ -179,15 +374,18 @@ export default function App() {
     onSearchToggle: handleSearchToggle,
     query,
     onQueryChange: setQuery,
+    onQuerySubmit: handleQuerySubmit,
   };
 
-  const pageTitle = query.trim()
-    ? "Search"
-    : activeTab === "My List"
-      ? "My List"
-      : activeTab === "Home"
-        ? "Browse"
-        : activeTab;
+  const pageTitle = activeTab === "Play4u"
+    ? "Play4u Catalog"
+    : query.trim()
+      ? "Search"
+      : activeTab === "My List"
+        ? "My List"
+        : activeTab === "Home"
+          ? "Browse"
+          : activeTab;
 
   const enterBrowse = (selectedProfile = profile) => {
     setProfile(selectedProfile);
@@ -254,7 +452,73 @@ export default function App() {
         </View>
       )}
 
-      {activeTab === "My List" && visibleItems.length === 0 && !query.trim() ? (
+      {activeTab === "Play4u" ? (
+        <>
+          <Play4uFilterBar
+            filters={play4uFilters}
+            onChange={handlePlay4uFilterChange}
+            onApply={() => loadPlay4u(1, query, play4uFilters)}
+            onClear={handleClearPlay4u}
+            loading={play4uLoading}
+            compact={compact}
+          />
+          <View style={[styles.railsWrap, styles.play4uRailsWrap]}>
+            {play4uLoading || !play4uLoaded ? (
+              <CatalogFeedback
+                title="Loading public titles…"
+                message="Fetching Play4u title cards and metadata."
+                compact={compact}
+              />
+            ) : play4uError ? (
+              <CatalogFeedback
+                title="The public catalog is temporarily unavailable"
+                message={play4uError}
+                actionLabel="Try again"
+                onAction={() => loadPlay4u(play4uPage, query, play4uFilters)}
+                compact={compact}
+              />
+            ) : play4uItems.length ? (
+              <MediaRail
+                title={rows[0]?.title || "Public titles on Play4u"}
+                items={play4uItems}
+                compact={compact}
+                onSelect={handleSelectItem}
+              />
+            ) : (
+              <CatalogFeedback
+                title="No public titles found"
+                message={hasPlay4uCriteria ? "Try another search or reset one of the filters." : "There are no titles to show on this catalog page."}
+                actionLabel={hasPlay4uCriteria ? "Reset search and filters" : undefined}
+                onAction={hasPlay4uCriteria ? handleClearPlay4u : undefined}
+                compact={compact}
+              />
+            )}
+            {!play4uLoading && !play4uError && (play4uPage > 1 || play4uHasMore) && (
+              <View style={[styles.pagination, compact && styles.paginationCompact]}>
+                <Pressable
+                  accessibilityLabel="Previous catalog page"
+                  accessibilityRole="button"
+                  disabled={play4uLoading || play4uPage <= 1}
+                  onPress={() => loadPlay4u(play4uPage - 1, query, play4uFilters)}
+                  style={[styles.pageButton, (play4uLoading || play4uPage <= 1) && styles.pageButtonDisabled]}
+                >
+                  <Text style={styles.pageButtonText}>Previous</Text>
+                </Pressable>
+                <Text style={styles.pageNumber}>Page {play4uPage}</Text>
+                <Pressable
+                  accessibilityLabel="Next catalog page"
+                  accessibilityRole="button"
+                  disabled={play4uLoading || !play4uHasMore}
+                  onPress={() => loadPlay4u(play4uPage + 1, query, play4uFilters)}
+                  style={[styles.pageButton, (play4uLoading || !play4uHasMore) && styles.pageButtonDisabled]}
+                >
+                  <Text style={styles.pageButtonText}>Next</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </>
+      ) : activeTab === "My List" && visibleItems.length === 0 && !query.trim() ? (
         <EmptyState onBrowse={() => handleTabChange("Home")} />
       ) : (
         <View style={[styles.railsWrap, isHome && styles.homeRailsWrap, compact && isHome && styles.homeRailsWrapCompact]}>
@@ -273,11 +537,11 @@ export default function App() {
         </View>
       )}
 
-      <Footer onOpenWelcome={() => setScreen("welcome")} />
+      <Footer onOpenWelcome={() => setScreen("welcome")} catalogMode={activeTab === "Play4u"} />
       <TitleDetailsModal
         item={selectedItem}
-        saved={selectedItem ? savedSet.has(selectedItem.id) : false}
-        onClose={() => setSelectedItem(null)}
+        saved={selectedItem && !selectedItem.isPublicCatalog ? savedSet.has(selectedItem.id) : false}
+        onClose={handleCloseDetails}
         onPlay={handlePlay}
         onToggleSaved={toggleSaved}
       />
@@ -296,6 +560,7 @@ const styles = StyleSheet.create({
   catalogTitle: { color: COLORS.white, fontFamily: "Arial", fontSize: 34, fontWeight: "800", letterSpacing: -0.5 },
   catalogTitleCompact: { fontSize: 28 },
   railsWrap: { paddingTop: 21, paddingBottom: 19 },
+  play4uRailsWrap: { paddingTop: 6 },
   homeRailsWrap: { position: "relative", zIndex: 3, marginTop: -76, paddingTop: 0 },
   homeRailsWrapCompact: { marginTop: -48 },
   noResults: { minHeight: 230, alignItems: "center", justifyContent: "center", paddingHorizontal: 22, paddingVertical: 42 },
@@ -303,4 +568,16 @@ const styles = StyleSheet.create({
   noResultsText: { marginTop: 8, color: COLORS.muted, fontFamily: "Arial", fontSize: 12, textAlign: "center" },
   clearButton: { marginTop: 16, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 3, backgroundColor: COLORS.white },
   clearButtonText: { color: COLORS.black, fontFamily: "Arial", fontSize: 10, fontWeight: "800" },
+  catalogFeedback: { minHeight: 205, alignItems: "center", justifyContent: "center", marginHorizontal: PAGE_GUTTER, paddingHorizontal: 24, paddingVertical: 38, borderWidth: 1, borderColor: "#333", borderRadius: 4, backgroundColor: "#181818" },
+  catalogFeedbackCompact: { minHeight: 180, marginHorizontal: 20, paddingHorizontal: 20 },
+  catalogFeedbackTitle: { color: COLORS.white, fontFamily: "Arial", fontSize: 18, fontWeight: "700", textAlign: "center" },
+  catalogFeedbackText: { maxWidth: 560, marginTop: 9, color: COLORS.muted, fontFamily: "Arial", fontSize: 11, lineHeight: 17, textAlign: "center" },
+  catalogFeedbackButton: { minHeight: 36, justifyContent: "center", marginTop: 17, paddingHorizontal: 15, borderRadius: 3, backgroundColor: COLORS.red },
+  catalogFeedbackButtonText: { color: COLORS.white, fontFamily: "Arial", fontSize: 10, fontWeight: "800" },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 17, marginTop: 3, marginBottom: 28 },
+  paginationCompact: { gap: 11, marginHorizontal: 20 },
+  pageButton: { minHeight: 36, justifyContent: "center", paddingHorizontal: 13, borderWidth: 1, borderColor: "#5b5b5b", borderRadius: 3, backgroundColor: "#232323" },
+  pageButtonText: { color: COLORS.white, fontFamily: "Arial", fontSize: 10, fontWeight: "700" },
+  pageButtonDisabled: { opacity: 0.4 },
+  pageNumber: { minWidth: 48, color: COLORS.muted, fontFamily: "Arial", fontSize: 10, textAlign: "center" },
 });
