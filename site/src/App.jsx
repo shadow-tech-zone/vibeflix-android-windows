@@ -121,16 +121,21 @@ export default function App() {
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const pageScrollRef = useRef(null);
-  const initialPlay4uRef = useRef(null);
-  if (initialPlay4uRef.current === null) {
-    initialPlay4uRef.current = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("catalog") === "play4u";
+  const initialCatalogRef = useRef(null);
+  if (initialCatalogRef.current === null) {
+    initialCatalogRef.current = typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.search).get("catalog") || "";
   }
-  const startInPlay4u = initialPlay4uRef.current;
-  const [screen, setScreen] = useState(startInPlay4u ? "browse" : "welcome");
-  const [activeTab, setActiveTab] = useState(startInPlay4u ? "Play4u" : "Home");
+  const startAtWelcome = initialCatalogRef.current === "welcome";
+  const startInLocalDemo = initialCatalogRef.current === "demo";
+  const startInPlay4u = !startAtWelcome && !startInLocalDemo;
+  const [screen, setScreen] = useState(startAtWelcome ? "welcome" : "browse");
+  const [play4uMode, setPlay4uMode] = useState(startInPlay4u);
+  const [activeTab, setActiveTab] = useState("Home");
   const [profile, setProfile] = useState("Sam");
   const [scrolled, setScrolled] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(startInPlay4u);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [play4uSearchText, setPlay4uSearchText] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
@@ -159,7 +164,7 @@ export default function App() {
         setSelectedItem(null);
         setPlayingItem(null);
         setSearchOpen(false);
-        if (activeTab !== "Play4u") setQuery("");
+        if (!play4uMode) setQuery("");
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -169,7 +174,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTab]);
+  }, [activeTab, play4uMode]);
 
   const loadPlay4u = async (page = 1, searchText = query, filters = play4uFilters) => {
     const requestId = ++play4uRequestRef.current;
@@ -211,8 +216,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeTab === "Play4u") loadPlay4u(1, query, play4uFilters);
-  }, [activeTab]);
+    if (play4uMode) loadPlay4u(1, "", play4uFilters);
+  }, [play4uMode]);
 
   const profileCatalog = useMemo(
     () => CATALOG.filter((item) => profile !== "Kids" || item.age <= 13),
@@ -237,21 +242,32 @@ export default function App() {
     return items;
   }, [activeTab, profileCatalog, query, savedSet]);
 
-  const isLocalHome = activeTab === "Home" && query.trim().length === 0;
-  const isPlay4uHome = activeTab === "Play4u" && !play4uSearchText && play4uItems.length > 0;
+  const isLocalHome = !play4uMode && activeTab === "Home" && query.trim().length === 0;
+  const isPlay4uHome = play4uMode
+    && ["Home", "Play4u"].includes(activeTab)
+    && !play4uSearchText
+    && play4uItems.length > 0;
   const isHome = isLocalHome || isPlay4uHome;
   const featuredItem = isPlay4uHome
     ? play4uItems[0]
     : profileCatalog.find((item) => item.id === FEATURED_TITLE_ID) || profileCatalog[0];
 
   const rows = useMemo(() => {
-    if (activeTab === "Play4u") {
-      const results = [{
-        id: "play4u-results",
-        title: play4uSearchText ? `Search results for “${play4uSearchText}”` : "Popular on Play4u",
-        items: play4uItems,
-      }];
-      if (!play4uSearchText && play4uItems.length) {
+    if (play4uMode && activeTab !== "My List") {
+      const items = activeTab === "Movies"
+        ? play4uItems.filter((item) => item.kind === "movie")
+        : activeTab === "TV Shows"
+          ? play4uItems.filter((item) => item.kind === "series")
+          : play4uItems;
+      if (play4uSearchText) {
+        return [{ id: "play4u-search-results", title: `Search results for “${play4uSearchText}”`, items }];
+      }
+      if (activeTab === "Movies") return [{ id: "play4u-movies", title: "Movies on Play4u", items }];
+      if (activeTab === "TV Shows") return [{ id: "play4u-series", title: "Series on Play4u", items }];
+      if (activeTab === "New & Popular") return [{ id: "play4u-new-popular", title: "New & Popular on Play4u", items }];
+
+      const results = [{ id: "play4u-results", title: "Popular on Play4u", items: play4uItems }];
+      if (play4uItems.length) {
         const movies = play4uItems.filter((item) => item.kind === "movie");
         const series = play4uItems.filter((item) => item.kind === "series");
         if (movies.length) results.push({ id: "play4u-movies", title: "Movies on Play4u", items: movies });
@@ -272,8 +288,10 @@ export default function App() {
       return [{ id: activeTab.toLowerCase(), title: activeTab, items: visibleItems }];
     }
     return buildHomeRows(profileCatalog, profile);
-  }, [activeTab, profile, profileCatalog, query, visibleItems, play4uItems, play4uSearchText]);
+  }, [activeTab, play4uMode, profile, profileCatalog, query, visibleItems, play4uItems, play4uSearchText]);
   const hasPlay4uCriteria = Boolean(play4uSearchText || Object.values(play4uFilters).some(Boolean));
+  const hasPlay4uVisibleItems = rows.some((row) => row.items.length > 0);
+  const play4uCategoryLabel = activeTab === "Movies" ? "movies" : activeTab === "TV Shows" ? "series" : "titles";
 
   const handlePageScroll = (event) => {
     const scrollY =
@@ -287,11 +305,13 @@ export default function App() {
 
   const handleTabChange = (tab) => {
     scrollPageToTop();
-    const alreadyOnPlay4u = tab === "Play4u" && activeTab === "Play4u";
+    const alreadyOnPlay4uView = tab === activeTab && (play4uMode || tab === "Play4u");
+    const clearRemoteSearch = play4uMode && tab !== activeTab && Boolean(play4uSearchText);
+    if (tab === "Play4u") setPlay4uMode(true);
     setActiveTab(tab);
-    setSearchOpen(tab === "Play4u");
+    setSearchOpen(false);
     setQuery("");
-    if (alreadyOnPlay4u) loadPlay4u(1, "", play4uFilters);
+    if (alreadyOnPlay4uView || clearRemoteSearch) loadPlay4u(1, "", play4uFilters);
   };
 
   const handleProfileChange = (name) => {
@@ -300,12 +320,13 @@ export default function App() {
     setActiveTab("Home");
     setSearchOpen(false);
     setQuery("");
+    if (play4uMode && play4uSearchText) loadPlay4u(1, "", play4uFilters);
   };
 
   const handleSearchToggle = () => {
     if (searchOpen) {
       setSearchOpen(false);
-      if (activeTab !== "Play4u") setQuery("");
+      if (!play4uMode) setQuery("");
     } else {
       scrollPageToTop();
       setSearchOpen(true);
@@ -313,12 +334,12 @@ export default function App() {
   };
 
   const handleQuerySubmit = () => {
-    if (activeTab === "Play4u") loadPlay4u(1, query, play4uFilters);
+    if (play4uMode && activeTab !== "My List") loadPlay4u(1, query, play4uFilters);
   };
 
   const handleQueryChange = (value) => {
     setQuery(value);
-    if (activeTab === "Play4u" && !value.trim() && play4uSearchText) {
+    if (play4uMode && activeTab !== "My List" && !value.trim() && play4uSearchText) {
       loadPlay4u(1, "", play4uFilters);
     }
   };
@@ -387,6 +408,7 @@ export default function App() {
 
   const navigationProps = {
     activeTab,
+    play4uMode,
     scrolled,
     onTabChange: handleTabChange,
     profile,
@@ -398,8 +420,14 @@ export default function App() {
     onQuerySubmit: handleQuerySubmit,
   };
 
-  const pageTitle = activeTab === "Play4u"
-    ? (play4uSearchText ? "Search results" : "Play4u Catalog")
+  const pageTitle = play4uMode && activeTab !== "My List"
+    ? (play4uSearchText
+      ? "Search results"
+      : activeTab === "Play4u"
+        ? "Popular on Play4u"
+        : activeTab === "Home"
+          ? "Browse"
+          : activeTab)
     : query.trim()
       ? "Search"
       : activeTab === "My List"
@@ -409,6 +437,7 @@ export default function App() {
           : activeTab;
 
   const enterBrowse = (selectedProfile = profile) => {
+    setPlay4uMode(false);
     setProfile(selectedProfile);
     setActiveTab("Home");
     setSearchOpen(false);
@@ -473,7 +502,7 @@ export default function App() {
         </View>
       )}
 
-      {activeTab === "Play4u" ? (
+      {play4uMode && activeTab !== "My List" ? (
         <>
           <Play4uFilterBar
             filters={play4uFilters}
@@ -498,7 +527,7 @@ export default function App() {
                 onAction={() => loadPlay4u(play4uPage, play4uSearchText, play4uFilters)}
                 compact={compact}
               />
-            ) : play4uItems.length ? (
+            ) : hasPlay4uVisibleItems ? (
               rows.map((row) => (
                 <MediaRail
                   key={row.id}
@@ -510,8 +539,12 @@ export default function App() {
               ))
             ) : (
               <CatalogFeedback
-                title="No public titles found"
-                message={hasPlay4uCriteria ? "Try another search or reset one of the filters." : "There are no titles to show on this catalog page."}
+                title={play4uItems.length ? `No ${play4uCategoryLabel} found on this page` : "No public titles found"}
+                message={hasPlay4uCriteria
+                  ? "Try another search or reset one of the filters."
+                  : play4uItems.length
+                    ? `There are no ${play4uCategoryLabel} to show on this catalog page.`
+                    : "There are no titles to show on this catalog page."}
                 actionLabel={hasPlay4uCriteria ? "Reset search and filters" : undefined}
                 onAction={hasPlay4uCriteria ? handleClearPlay4u : undefined}
                 compact={compact}
@@ -542,6 +575,14 @@ export default function App() {
             )}
           </View>
         </>
+      ) : play4uMode && activeTab === "My List" ? (
+        <CatalogFeedback
+          title="Play4u titles are browse-only"
+          message="This public catalog does not save Play4u titles to the local VibeFlix demo list."
+          actionLabel="Browse Play4u titles"
+          onAction={() => handleTabChange("Play4u")}
+          compact={compact}
+        />
       ) : activeTab === "My List" && visibleItems.length === 0 && !query.trim() ? (
         <EmptyState onBrowse={() => handleTabChange("Home")} />
       ) : (
@@ -561,7 +602,7 @@ export default function App() {
         </View>
       )}
 
-      <Footer onOpenWelcome={() => setScreen("welcome")} catalogMode={activeTab === "Play4u"} />
+      <Footer onOpenWelcome={() => setScreen("welcome")} catalogMode={play4uMode && activeTab !== "My List"} />
       <TitleDetailsModal
         item={selectedItem}
         saved={selectedItem && !selectedItem.isPublicCatalog ? savedSet.has(selectedItem.id) : false}

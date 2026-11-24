@@ -16,6 +16,7 @@ const PROFILES = ["Sam", "Kids"];
 export default function Navigation({
   activeTab,
   compact,
+  play4uMode = false,
   scrolled,
   onTabChange,
   profile,
@@ -72,13 +73,13 @@ export default function Navigation({
           <View style={[styles.searchBox, navCompact && styles.searchBoxCompact]}>
             <Text style={styles.searchGlyph}>⌕</Text>
             <TextInput
-              accessibilityLabel={activeTab === "Play4u" ? "Search Play4u titles" : "Search titles and genres"}
+              accessibilityLabel={play4uMode ? "Search Play4u titles" : "Search titles and genres"}
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={120}
               onChangeText={onQueryChange}
               onSubmitEditing={onQuerySubmit}
-              placeholder={activeTab === "Play4u" ? "Search Play4u titles" : "Titles, people, genres"}
+              placeholder={play4uMode ? "Search Play4u titles" : "Titles, people, genres"}
               placeholderTextColor="#b3b3b3"
               returnKeyType="search"
               style={styles.searchInput}
