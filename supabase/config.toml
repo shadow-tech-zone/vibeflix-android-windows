@@ -1,1 +1,4 @@
 project_id = "vibeflix-sync"
+
+[functions.vibeflix-provider]
+verify_jwt = false

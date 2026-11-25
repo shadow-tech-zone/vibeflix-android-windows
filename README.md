@@ -2,22 +2,34 @@
 
 > **Hobby/personal-use disclaimer:** VibeFlix is a personal project, not a commercial service, and is not affiliated with Netflix or any content provider. It is provided as-is, without warranties. Use only content and services you are authorized to access. VibeFlix uses its own name, UI, icons, and artwork—not Netflix branding or proprietary assets.
 
-## Android mobile app
+## Active focus: GitHub Pages web app
 
-This repository is scoped to the native Android app. The canonical Java/Media3 source is [`android/vibeflix-v31-source.zip`](android/vibeflix-v31-source.zip); CI extracts that archive and applies release-time package/version updates. See [`android/README.md`](android/README.md) for the source, build, and release notes.
+The current product target is a responsive VibeFlix web app in [`web/`](web/) backed by the deployed Supabase Edge Function `vibeflix-provider` in project `vibeflix-sync` (`fzhrpgoouourzzhfvuzk`). The static client is designed for GitHub Pages; the function makes provider-side catalog, title-detail, episode, and on-demand stream-resolution requests from the server side. Its source is tracked in [`supabase/functions/vibeflix-provider/`](supabase/functions/vibeflix-provider/).
 
-[`site/`](site/) is a single-page React Native Web overview for the Android app, not a browser version of the player. It uses original, hand-authored visual elements and contains no remote artwork.
+The web client includes source/filter/search browsing, title details, series seasons and episodes, on-demand stream selection, HLS/browser video playback, and local My List, Continue Watching, resume progress, and watch history. Local library state stays in this browser. Stream URLs are resolved only after Play and are held in memory; they are not written to local storage or logged.
 
-The app includes Home, Search, categories, My List, watch history, Continue Watching, title/episode resume, season and episode selection, Next Episode, and Media3 playback. Local library behavior remains available offline and while signed out. User-facing source names are **Server 1**, **Server 2**, and **Both Servers**.
+**Live provider access and browser playback are not yet verified.** Catalog HTML/API formats, provider availability, CORS, media headers, and stream/CDN behavior can change or prevent playback. A successful build is not proof that any particular catalog or stream works. The function intentionally does not proxy or persist media files.
 
-## Optional library sync
+### Web setup
 
-Supabase is used only for explicitly opted-in account/library sync. It does not resolve streams or deliver media. The applied RLS-protected migrations are in [`supabase/migrations/`](supabase/migrations/); the design, data boundaries, and outstanding verification are documented in [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md). Cloud payloads exclude playback URLs and provider credentials.
+1. Optional: copy `web/.env.example` to `web/.env.local` to override the configured project URL/key. The Vite client uses the project's **publishable** key, which is designed to be public; never use a Supabase secret/service-role key in a browser app.
+2. Run `cd web && npm ci && npm run dev`.
+3. The `vibeflix-provider` Edge Function is deployed to `vibeflix-sync` with JWT verification disabled for the public client endpoint. Its CORS allow-list includes this repository's GitHub Pages origin and local Vite development. To redeploy from a linked Supabase CLI checkout, run `supabase functions deploy vibeflix-provider --project-ref fzhrpgoouourzzhfvuzk`.
+4. Enable GitHub Pages with **GitHub Actions** as its source, then deploy from `main` using [`.github/workflows/web-pages.yml`](.github/workflows/web-pages.yml). The project Pages URL is `https://shadow-tech-zone.github.io/vibeflix-android-windows/`. The Pages workflow can use an optional `VITE_SUPABASE_PUBLISHABLE_KEY` Actions secret and `VITE_SUPABASE_URL` repository variable to override the public project defaults. A manual workflow dispatch also runs a live provider/media-CORS smoke check; that check has not yet run.
 
-## Build and release
+## Other clients and project history
 
-- [`.github/workflows/build-phone.yml`](.github/workflows/build-phone.yml) extracts the Android archive, runs offline tests, verifies debug package metadata, and uploads a private test artifact. This is not a public release.
-- [`.github/workflows/release-phone.yml`](.github/workflows/release-phone.yml) is gated on the approved signing/key-rotation setup and publishes an Android release from `main` only.
-- [`release.json`](release.json) contains the Android version and release metadata. Never reuse a version tag or commit signing material, passwords, or service-role credentials.
+- **Android:** [`android/vibeflix-v31-source.zip`](android/vibeflix-v31-source.zip) remains the canonical source archive for the existing Java/Media3 Android client. Its sync schema and privacy boundaries are documented in [`docs/supabase-schema-rls-design.md`](docs/supabase-schema-rls-design.md). Existing Android CI and release safeguards remain in place; this web pivot does not modify Android source.
+- **Windows:** [`windows/`](windows/) contains a native WinUI 3/.NET desktop prototype with local-file playback and local library state. Provider browsing and streams are not the active Windows work target.
+- **Supabase:** `supabase/migrations/` tracks the existing RLS-protected sync schema. The new Edge Function is separate from those sync tables and does not require a database migration.
+- **Project history and architecture:** see [`docs/PROJECT-HISTORY.md`](docs/PROJECT-HISTORY.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-CI and offline tests do not prove live provider availability, playback on a particular device/network, cross-device restore, cross-user RLS isolation, or Play Protect clearance. Keep Play Protect enabled.
+## Repository layout
+
+- `web/` — React, TypeScript, Vite client and its GitHub Pages build.
+- `supabase/functions/vibeflix-provider/` — server-side provider adapter; stream resolution is on demand.
+- `supabase/migrations/` — user-scoped library sync schema; unrelated to web local-library persistence.
+- `.github/workflows/web-pages.yml` — web lint/build validation and GitHub Pages deployment from `main`.
+- `.github/workflows/build-phone.yml`, `.github/workflows/release-phone.yml` — Android CI and gated release flow.
+- `.github/workflows/build-windows.yml` — Windows-hosted build check.
+- `android/`, `windows/`, `docs/` — existing client sources, prototypes, and design/history documents.
